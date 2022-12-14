@@ -18,30 +18,35 @@ func FillFromValues(struct_to_fill any, values_to_fill ...any) error {
 	}
 	typeOfT := rs.Type()
 	ignored := []int{}
-	for i := 0; i < rs.NumField(); i++ {
-		if ftag, ok := typeOfT.Field(i).Tag.Lookup("korm"); ok {
-			if ftag == "-" {
-				ignored = append(ignored, i)
-				continue
+	
+	loop:
+		for i := 0; i < rs.NumField(); i++ {	
+			if ftag, ok := typeOfT.Field(i).Tag.Lookup("korm"); ok {
+				if ftag == "-" {
+					ignored = append(ignored, i)
+					continue
+				}
+				if strings.Contains(ftag,"pk") || strings.Contains(ftag,"autoinc") {
+					switch values_to_fill[i].(type) {
+					case int,uint,int64,uint64,uint32,int32:
+					default:
+						ignored = append(ignored, i)
+						continue loop
+					} 
+				}
+			}
+
+			field := rs.Field(i)
+			if field.IsValid() {
+				index := i
+				if len(values_to_fill) < rs.NumField() {
+					index= i-len(ignored)
+				}
+				SetReflectFieldValue(field, values_to_fill[index])
+			} else {
+				return errors.New("FillFromValues error: "+ToSnakeCase(typeOfT.Field(i).Name)+" not valid")
 			}
 		}
-		if len(values_to_fill) < rs.NumField() {
-			if i == 0 && strings.Contains(strings.ToLower(typeOfT.Field(i).Name),"id") {
-				ignored = append(ignored, i)
-				continue
-			} 
-		} 
-		field := rs.Field(i)
-		if field.IsValid() {
-			index := i
-			if len(values_to_fill) < rs.NumField() {
-				index= i-len(ignored)
-			}
-			SetReflectFieldValue(field, values_to_fill[index])
-		} else {
-			return errors.New("FillFromValues error: "+ToSnakeCase(typeOfT.Field(i).Name)+" not valid")
-		}
-	}
 	return nil
 }
 
