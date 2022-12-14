@@ -18,6 +18,11 @@ func FillFromValues(struct_to_fill any, values_to_fill ...any) error {
 	}
 	typeOfT := rs.Type()
 	for i := 0; i < rs.NumField(); i++ {
+		if ftag, ok := typeOfT.Field(i).Tag.Lookup("korm"); ok {
+			if ftag == "-" {
+				continue
+			}
+		}
 		if len(values_to_fill) < rs.NumField() {
 			if i == 0 && strings.Contains(strings.ToLower(typeOfT.Field(i).Name),"id") {
 				continue
