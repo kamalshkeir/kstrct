@@ -2,6 +2,7 @@ package kstrct
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
 	"strings"
 )
@@ -27,12 +28,10 @@ func FillFromValues(struct_to_fill any, values_to_fill ...any) error {
 					continue
 				}
 				if strings.Contains(ftag,"pk") || strings.Contains(ftag,"autoinc") {
-					switch values_to_fill[i].(type) {
-					case int,uint,int64,uint64,uint32,int32:
-					default:
+					if len(values_to_fill) != rs.NumField() {
 						ignored = append(ignored, i)
 						continue loop
-					} 
+					}
 				}
 			}
 
@@ -42,6 +41,8 @@ func FillFromValues(struct_to_fill any, values_to_fill ...any) error {
 				if len(values_to_fill) < rs.NumField() {
 					index= i-len(ignored)
 				}
+				fmt.Println("ignored:",ignored)
+				fmt.Println(ToSnakeCase(typeOfT.Field(index).Name),":",values_to_fill[index])
 				SetReflectFieldValue(field, values_to_fill[index])
 			} else {
 				return errors.New("FillFromValues error: "+ToSnakeCase(typeOfT.Field(i).Name)+" not valid")
