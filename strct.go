@@ -26,9 +26,7 @@ func FillFromValues(struct_to_fill any, values_to_fill ...any) error {
 		if len(values_to_fill) < rs.NumField() {
 			if i == 0 && strings.Contains(strings.ToLower(typeOfT.Field(i).Name),"id") {
 				continue
-			} else {
-				return ErrorLength
-			}
+			} 
 		} 
 		field := rs.Field(i)
 		if field.IsValid() {
