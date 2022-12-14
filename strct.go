@@ -17,14 +17,17 @@ func FillFromValues(struct_to_fill any, values_to_fill ...any) error {
 		rs = reflect.ValueOf(struct_to_fill).Elem()
 	}
 	typeOfT := rs.Type()
+	ignored := []int{}
 	for i := 0; i < rs.NumField(); i++ {
 		if ftag, ok := typeOfT.Field(i).Tag.Lookup("korm"); ok {
 			if ftag == "-" {
+				ignored = append(ignored, i)
 				continue
 			}
 		}
 		if len(values_to_fill) < rs.NumField() {
 			if i == 0 && strings.Contains(strings.ToLower(typeOfT.Field(i).Name),"id") {
+				ignored = append(ignored, i)
 				continue
 			} 
 		} 
@@ -32,7 +35,7 @@ func FillFromValues(struct_to_fill any, values_to_fill ...any) error {
 		if field.IsValid() {
 			index := i
 			if len(values_to_fill) < rs.NumField() {
-				index= i-1
+				index= i-len(ignored)
 			}
 			SetReflectFieldValue(field, values_to_fill[index])
 		} else {
