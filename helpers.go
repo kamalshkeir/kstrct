@@ -147,6 +147,18 @@ func SetReflectFieldValue(fld reflect.Value, value any) {
 	case reflect.Float64:
 		if v, ok := value.(float64); ok {
 			fld.SetFloat(v)
+		} else if v, ok := value.(string);ok {
+			f64,err := strconv.ParseFloat(v,64)
+			if err == nil {
+				fld.SetFloat(f64)
+			}
+		} else if v, ok := value.([]byte);ok {
+			f64,err := strconv.ParseFloat(string(v),64)
+			if err == nil {
+				fld.SetFloat(f64)
+			}
+		} else {
+			fmt.Printf("cannot set float64 from setReflectFieldValue :%T\n",value)
 		}
 	case reflect.Slice:
 		targetType := fld.Type()
