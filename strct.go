@@ -2,6 +2,7 @@ package kstrct
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
 	"strings"
 )
@@ -44,6 +45,7 @@ func FillFromValues(struct_to_fill any, values_to_fill ...any) error {
 			if len(values_to_fill) < len(fieldsIndexes) {
 				idx = i-1
 			}
+			fmt.Println(ToSnakeCase(typeOfT.Field(fi).Name),values_to_fill[idx])
 			SetReflectFieldValue(field, values_to_fill[idx])
 		} else {
 			return errors.New("FillFromValues error: "+ToSnakeCase(typeOfT.Field(fi).Name)+" not valid")
