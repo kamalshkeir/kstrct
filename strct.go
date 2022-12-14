@@ -49,7 +49,7 @@ func FillFromValues(struct_to_fill any, values_to_fill ...any) error {
 						fmt.Println(ToSnakeCase(typeOfT.Field(index).Name),":",values_to_fill[index])
 					}
 				}()
-				
+				fmt.Println("-----------------")
 				SetReflectFieldValue(field, values_to_fill[index])
 			} else {
 				return errors.New("FillFromValues error: "+ToSnakeCase(typeOfT.Field(i).Name)+" not valid")
