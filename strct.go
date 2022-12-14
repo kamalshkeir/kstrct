@@ -41,8 +41,15 @@ func FillFromValues(struct_to_fill any, values_to_fill ...any) error {
 				if len(values_to_fill) < rs.NumField() {
 					index= i-len(ignored)
 				}
-				fmt.Println("ignored:",ignored)
-				fmt.Println(ToSnakeCase(typeOfT.Field(index).Name),":",values_to_fill[index])
+				defer func() {
+					if r := recover(); r != nil {
+						fmt.Println("Recovered. Error:\n", r)
+						fmt.Println("ignored:",ignored)
+						fmt.Println("values:",values_to_fill)
+						fmt.Println(ToSnakeCase(typeOfT.Field(index).Name),":",values_to_fill[index])
+					}
+				}()
+				
 				SetReflectFieldValue(field, values_to_fill[index])
 			} else {
 				return errors.New("FillFromValues error: "+ToSnakeCase(typeOfT.Field(i).Name)+" not valid")
