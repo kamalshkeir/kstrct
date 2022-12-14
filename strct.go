@@ -2,7 +2,6 @@ package kstrct
 
 import (
 	"errors"
-	"fmt"
 	"reflect"
 	"strings"
 )
@@ -18,43 +17,38 @@ func FillFromValues(struct_to_fill any, values_to_fill ...any) error {
 		rs = reflect.ValueOf(struct_to_fill).Elem()
 	}
 	typeOfT := rs.Type()
-	ignored := []int{}
-	
-	loop:
-		for i := 0; i < rs.NumField(); i++ {	
-			if ftag, ok := typeOfT.Field(i).Tag.Lookup("korm"); ok {
-				if ftag == "-" {
-					ignored = append(ignored, i)
-					continue
-				}
-				if strings.Contains(ftag,"pk") || strings.Contains(ftag,"autoinc") {
-					if len(values_to_fill) != rs.NumField() {
-						ignored = append(ignored, i)
-						continue loop
-					}
-				}
-			}
+	fieldsIndexes := []int{}
 
-			field := rs.Field(i)
-			if field.IsValid() {
-				index := i
-				if len(values_to_fill) < rs.NumField() {
-					index= i-len(ignored)
+	for i := 0; i < rs.NumField(); i++ {	
+		if ftag, ok := typeOfT.Field(i).Tag.Lookup("korm"); ok {
+			if ftag != "-" {
+				fieldsIndexes = append(fieldsIndexes, i)
+			}
+		} else {
+			fieldsIndexes = append(fieldsIndexes, i)
+		}
+	}
+
+	for i,fi := range fieldsIndexes {	
+		idx := i
+		if ftag, ok := typeOfT.Field(fi).Tag.Lookup("korm"); ok {
+			if strings.Contains(ftag,"pk") || strings.Contains(ftag,"autoinc") {
+				if len(values_to_fill) < len(fieldsIndexes) {
+					continue 
 				}
-				defer func() {
-					if r := recover(); r != nil {
-						fmt.Println("Recovered. Error:\n", r)
-						fmt.Println("ignored:",ignored)
-						fmt.Println("values:",values_to_fill)
-						fmt.Println(ToSnakeCase(typeOfT.Field(index).Name),":",values_to_fill[index])
-					}
-				}()
-				fmt.Println("-----------------")
-				SetReflectFieldValue(field, values_to_fill[index])
-			} else {
-				return errors.New("FillFromValues error: "+ToSnakeCase(typeOfT.Field(i).Name)+" not valid")
 			}
 		}
+		
+		field := rs.Field(fi)
+		if field.IsValid() {	
+			if len(values_to_fill) < len(fieldsIndexes) {
+				idx = i-1
+			}
+			SetReflectFieldValue(field, values_to_fill[idx])
+		} else {
+			return errors.New("FillFromValues error: "+ToSnakeCase(typeOfT.Field(fi).Name)+" not valid")
+		}
+	}
 	return nil
 }
 
