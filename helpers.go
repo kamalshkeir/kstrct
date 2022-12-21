@@ -63,7 +63,7 @@ func SetReflectFieldValue(fld reflect.Value, value any) error {
 						fld.Set(reflect.ValueOf(t))
 					}
 				} else {
-					fmt.Println("SetFieldValue Struct: doesn't match any case", v)
+					errRecover = fmt.Errorf("setFieldValue Struct: doesn't match any case: %v", v)
 				}
 			}
 		case time.Time:
@@ -75,7 +75,7 @@ func SetReflectFieldValue(fld reflect.Value, value any) error {
 				errRecover = SetReflectFieldValue(fld.Field(i), v[i])
 			}
 		default:
-			fmt.Println("case not handled for struct field", fld.Type().Name(), ", got", v, "of type", fmt.Sprintf("%T\n", v))
+			errRecover = fmt.Errorf("case struct SetReflectFieldValue got value: %v is not valid for, fieldName : %s", valueToSet.Interface(), fld.Type().Name())
 		}
 	case reflect.String:
 		switch valueToSet.Kind() {
@@ -87,8 +87,7 @@ func SetReflectFieldValue(fld reflect.Value, value any) error {
 			if valueToSet.IsValid() {
 				fld.Set(valueToSet)
 			} else {
-				fmt.Println()
-				errRecover = fmt.Errorf("case string SetReflectFieldValue : %v is not valid for, fieldName : %s", valueToSet.Interface(), fld.Type().Name())
+				errRecover = fmt.Errorf("case string SetReflectFieldValue got value: %v is not valid for, fieldName : %s", valueToSet.Interface(), fld.Type().Name())
 			}
 		}
 	case reflect.Int:
@@ -198,7 +197,7 @@ func SetReflectFieldValue(fld reflect.Value, value any) error {
 						array = reflect.Append(array, reflect.ValueOf(vv))
 					}
 				default:
-					fmt.Println("filling slice received:", typeName)
+					errRecover = fmt.Errorf("filling slice received:%s", typeName)
 				}
 			}
 			fld.Set(array)
@@ -208,7 +207,7 @@ func SetReflectFieldValue(fld reflect.Value, value any) error {
 		case []byte:
 			fld.SetString(string(v))
 		default:
-			fmt.Println("setFieldValue: case not handled , unable to fill struct,field kind:", fld.Kind(), ",value to fill:", value)
+			errRecover = fmt.Errorf("setFieldValue: case not handled , unable to fill struct,field kind: %v, value to fill : %v", fld.Kind(), value)
 		}
 	}
 	return errRecover
