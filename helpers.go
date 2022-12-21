@@ -1,6 +1,7 @@
 package kstrct
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"regexp"
@@ -11,11 +12,23 @@ import (
 
 var (
 	matchFirstCap = regexp.MustCompile("(.)([A-Z][a-z]+)")
-	matchAllCap = regexp.MustCompile("([a-z0-9])([A-Z])")
+	matchAllCap   = regexp.MustCompile("([a-z0-9])([A-Z])")
 )
 
-
-func SetReflectFieldValue(fld reflect.Value, value any) {
+func SetReflectFieldValue(fld reflect.Value, value any) error {
+	var errRecover error
+	defer func() {
+		if r := recover(); r != nil {
+			switch x := r.(type) {
+			case string:
+				errRecover = errors.New(x)
+			case error:
+				errRecover = x
+			default:
+				errRecover = fmt.Errorf("unknown panic: %v", r)
+			}
+		}
+	}()
 	valueToSet := reflect.ValueOf(value)
 	switch fld.Kind() {
 	case valueToSet.Kind():
@@ -24,14 +37,14 @@ func SetReflectFieldValue(fld reflect.Value, value any) {
 		unwrapped := fld.Elem()
 		if !unwrapped.IsValid() {
 			newUnwrapped := reflect.New(fld.Type().Elem())
-			SetReflectFieldValue(newUnwrapped, value)
+			errRecover = SetReflectFieldValue(newUnwrapped, value)
 			fld.Set(newUnwrapped)
-			return
+		} else {
+			errRecover = SetReflectFieldValue(unwrapped, value)
 		}
-		SetReflectFieldValue(unwrapped, value)
 	case reflect.Interface:
 		unwrapped := fld.Elem()
-		SetReflectFieldValue(unwrapped, value)
+		errRecover = SetReflectFieldValue(unwrapped, value)
 	case reflect.Struct:
 		switch v := value.(type) {
 		case string:
@@ -55,12 +68,14 @@ func SetReflectFieldValue(fld reflect.Value, value any) {
 			}
 		case time.Time:
 			fld.Set(valueToSet)
-		
+
 		case []any:
 			// walk the fields
 			for i := 0; i < fld.NumField(); i++ {
-				SetReflectFieldValue(fld.Field(i), v[i])
+				errRecover = SetReflectFieldValue(fld.Field(i), v[i])
 			}
+		default:
+			fmt.Println("case not handled for struct field", fld.Type().Name(), ", got", v, "of type", fmt.Sprintf("%T\n", v))
 		}
 	case reflect.String:
 		switch valueToSet.Kind() {
@@ -72,7 +87,8 @@ func SetReflectFieldValue(fld reflect.Value, value any) {
 			if valueToSet.IsValid() {
 				fld.Set(valueToSet)
 			} else {
-				fmt.Println("SetReflectFieldValue case string: ", valueToSet.Interface(), "is not valid")
+				fmt.Println()
+				errRecover = fmt.Errorf("case string SetReflectFieldValue : %v is not valid for, fieldName : %s", valueToSet.Interface(), fld.Type().Name())
 			}
 		}
 	case reflect.Int:
@@ -147,18 +163,18 @@ func SetReflectFieldValue(fld reflect.Value, value any) {
 	case reflect.Float64:
 		if v, ok := value.(float64); ok {
 			fld.SetFloat(v)
-		} else if v, ok := value.(string);ok {
-			f64,err := strconv.ParseFloat(v,64)
+		} else if v, ok := value.(string); ok {
+			f64, err := strconv.ParseFloat(v, 64)
 			if err == nil {
 				fld.SetFloat(f64)
 			}
-		} else if v, ok := value.([]byte);ok {
-			f64,err := strconv.ParseFloat(string(v),64)
+		} else if v, ok := value.([]byte); ok {
+			f64, err := strconv.ParseFloat(string(v), 64)
 			if err == nil {
 				fld.SetFloat(f64)
 			}
 		} else {
-			fmt.Printf("cannot set float64 from setReflectFieldValue :%T\n",value)
+			errRecover = fmt.Errorf("cannot set float64 from setReflectFieldValue :%T", value)
 		}
 	case reflect.Slice:
 		targetType := fld.Type()
@@ -170,20 +186,19 @@ func SetReflectFieldValue(fld reflect.Value, value any) {
 				case "string":
 					array = reflect.Append(array, reflect.ValueOf(v))
 				case "int":
-					if vv,err := strconv.Atoi(v);err == nil {
+					if vv, err := strconv.Atoi(v); err == nil {
 						array = reflect.Append(array, reflect.ValueOf(vv))
-					} 
+					}
 				case "uint":
-					if vv,err := strconv.ParseUint(v,10,64);err == nil {
+					if vv, err := strconv.ParseUint(v, 10, 64); err == nil {
 						array = reflect.Append(array, reflect.ValueOf(uint(vv)))
-					} 
+					}
 				case "float64":
-					if vv,err :=strconv.ParseFloat(v,64);err == nil {
+					if vv, err := strconv.ParseFloat(v, 64); err == nil {
 						array = reflect.Append(array, reflect.ValueOf(vv))
 					}
 				default:
-					fmt.Println("filling slice received:",typeName)
-					return
+					fmt.Println("filling slice received:", typeName)
 				}
 			}
 			fld.Set(array)
@@ -196,6 +211,7 @@ func SetReflectFieldValue(fld reflect.Value, value any) {
 			fmt.Println("setFieldValue: case not handled , unable to fill struct,field kind:", fld.Kind(), ",value to fill:", value)
 		}
 	}
+	return errRecover
 }
 
 func ToSnakeCase(str string) string {
@@ -206,20 +222,20 @@ func ToSnakeCase(str string) string {
 
 func SnakeCaseToTitle(inputUnderScoreStr string) (camelCase string) {
 	//snake_case to camelCase
-	if strings.Contains(inputUnderScoreStr,"_") {
-		sp := strings.Split(inputUnderScoreStr,"_")
+	if strings.Contains(inputUnderScoreStr, "_") {
+		sp := strings.Split(inputUnderScoreStr, "_")
 		for i := range sp {
 			sp[i] = strings.ToUpper(string(sp[i][0])) + sp[i][1:]
 		}
-		inputUnderScoreStr=strings.Join(sp,"")
+		inputUnderScoreStr = strings.Join(sp, "")
 	} else {
 		fl := strings.ToUpper(inputUnderScoreStr)[0]
-		inputUnderScoreStr = string(fl)+inputUnderScoreStr[1:]
+		inputUnderScoreStr = string(fl) + inputUnderScoreStr[1:]
 	}
 	return inputUnderScoreStr
 }
 
-func GetInfos[T comparable](strct *T,tags ...string) (fields []string, fValues map[string]any, fTypes map[string]string, fTags map[string][]string) {
+func GetInfos[T comparable](strct *T, tags ...string) (fields []string, fValues map[string]any, fTypes map[string]string, fTags map[string][]string) {
 	fields = []string{}
 	fValues = map[string]any{}
 	fTypes = map[string]string{}
@@ -237,7 +253,7 @@ func GetInfos[T comparable](strct *T,tags ...string) (fields []string, fValues m
 		fields = append(fields, fname)
 		fTypes[fname] = ftype
 		fValues[fname] = fvalue
-		for _,t := range tags {
+		for _, t := range tags {
 			if ftag, ok := typeOfT.Field(i).Tag.Lookup(t); ok {
 				tags := strings.Split(ftag, ";")
 				fTags[fname] = append(fTags[fname], tags...)
