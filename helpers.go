@@ -68,14 +68,13 @@ func SetReflectFieldValue(fld reflect.Value, value any) error {
 			}
 		case time.Time:
 			fld.Set(valueToSet)
-
 		case []any:
 			// walk the fields
 			for i := 0; i < fld.NumField(); i++ {
 				errRecover = SetReflectFieldValue(fld.Field(i), v[i])
 			}
 		default:
-			errRecover = fmt.Errorf("case struct SetReflectFieldValue got value: %v is not valid for, fieldName : %s", valueToSet.Interface(), fld.Type().Name())
+			errRecover = fmt.Errorf("case struct SetReflectFieldValue got value %v which is not valid for fieldName : %s", valueToSet.Interface(), fld.Type().Name())
 		}
 	case reflect.String:
 		switch valueToSet.Kind() {
@@ -87,7 +86,7 @@ func SetReflectFieldValue(fld reflect.Value, value any) error {
 			if valueToSet.IsValid() {
 				fld.Set(valueToSet)
 			} else {
-				errRecover = fmt.Errorf("case string SetReflectFieldValue got value: %v is not valid for, fieldName : %s", valueToSet.Interface(), fld.Type().Name())
+				errRecover = fmt.Errorf("case struct SetReflectFieldValue got value %v which is not valid for fieldName : %s", valueToSet.Interface(), fld.Type().Name())
 			}
 		}
 	case reflect.Int:

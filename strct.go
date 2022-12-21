@@ -49,7 +49,7 @@ func FillFromValues(struct_to_fill any, values_to_fill ...any) error {
 			}
 			err := SetReflectFieldValue(field, values_to_fill[idx])
 			if err != nil {
-				return err
+				continue
 			}
 		} else {
 			return errors.New("FillFromValues error: " + ToSnakeCase(typeOfT.Field(fi).Name) + " not valid")
