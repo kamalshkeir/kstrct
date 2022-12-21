@@ -31,7 +31,7 @@ func FillFromValues(struct_to_fill any, values_to_fill ...any) error {
 	for i, fi := range fieldsIndexes {
 		idx := i
 		if ftag, ok := typeOfT.Field(fi).Tag.Lookup("korm"); ok {
-			if strings.Contains(ftag, "pk") || strings.Contains(ftag, "autoinc") || strings.Contains(ftag, "-") {
+			if strings.Contains(ftag, "pk") || strings.Contains(ftag, "autoinc") || strings.Contains(ftag, "-") || strings.Contains(ftag, "m2m") {
 				if len(values_to_fill) < len(fieldsIndexes) {
 					continue
 				}
@@ -49,7 +49,7 @@ func FillFromValues(struct_to_fill any, values_to_fill ...any) error {
 			}
 			err := SetReflectFieldValue(field, values_to_fill[idx])
 			if err != nil {
-				continue
+				return err
 			}
 		} else {
 			return errors.New("FillFromValues error: " + ToSnakeCase(typeOfT.Field(fi).Name) + " not valid")
