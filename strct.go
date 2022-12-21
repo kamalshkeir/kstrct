@@ -20,6 +20,10 @@ func FillFromValues(struct_to_fill any, values_to_fill ...any) error {
 
 	for i := 0; i < rs.NumField(); i++ {
 		if ftag, ok := typeOfT.Field(i).Tag.Lookup("korm"); ok {
+			if ftag != "-" && !strings.Contains(ftag, "m2m") {
+				fieldsIndexes = append(fieldsIndexes, i)
+			}
+		} else if ftag, ok := typeOfT.Field(i).Tag.Lookup("kstrct"); ok {
 			if ftag != "-" {
 				fieldsIndexes = append(fieldsIndexes, i)
 			}
@@ -31,13 +35,13 @@ func FillFromValues(struct_to_fill any, values_to_fill ...any) error {
 	for i, fi := range fieldsIndexes {
 		idx := i
 		if ftag, ok := typeOfT.Field(fi).Tag.Lookup("korm"); ok {
-			if strings.Contains(ftag, "pk") || strings.Contains(ftag, "autoinc") || strings.Contains(ftag, "-") || strings.Contains(ftag, "m2m") {
+			if ftag == "pk" || ftag == "autoinc" || ftag == "-" || strings.Contains(ftag, "m2m") {
 				if len(values_to_fill) < len(fieldsIndexes) {
 					continue
 				}
 			}
 		} else if ftag, ok := typeOfT.Field(fi).Tag.Lookup("kstrct"); ok {
-			if strings.Contains(ftag, "-") && len(values_to_fill) < len(fieldsIndexes) {
+			if ftag == "-" && len(values_to_fill) < len(fieldsIndexes) {
 				continue
 			}
 		}
