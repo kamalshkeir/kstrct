@@ -2,6 +2,7 @@ package kstrct
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
 	"strings"
 )
@@ -10,25 +11,36 @@ var (
 	ErrorLength = errors.New("error FillSelectedValues: len(values_to_fill) and len(struct fields) should be the same")
 )
 
-func FillFromValues(struct_to_fill any, values_to_fill ...any) error {
-	rs := reflect.ValueOf(struct_to_fill)
+func FillFromValues(structToFill interface{}, valuesToFill ...interface{}) error {
+	rs := reflect.ValueOf(structToFill)
 	if rs.Kind() == reflect.Pointer {
-		rs = reflect.ValueOf(struct_to_fill).Elem()
+		rs = reflect.ValueOf(structToFill).Elem()
 	}
 	typeOfT := rs.Type()
-	fieldsIndexes := []int{}
+	fieldsIndexes := make([]int, 0, rs.NumField())
 
 	for i := 0; i < rs.NumField(); i++ {
-		if ftag, ok := typeOfT.Field(i).Tag.Lookup("korm"); ok {
-			if ftag != "-" && !strings.Contains(ftag, "m2m") {
+		field := typeOfT.Field(i)
+		kormTag, kormOk := field.Tag.Lookup("korm")
+		kstrctTag, kstrctOk := field.Tag.Lookup("kstrct")
+
+		if kormOk {
+			switch kormTag {
+			case "pk", "autoinc", "-":
+				continue
+			case "m2m":
+				if !strings.Contains(kormTag, "m2m") {
+					fieldsIndexes = append(fieldsIndexes, i)
+				}
+			default:
 				fieldsIndexes = append(fieldsIndexes, i)
 			}
-		} else if ftag, ok := typeOfT.Field(i).Tag.Lookup("kstrct"); ok {
-			if ftag != "-" {
-				fieldsIndexes = append(fieldsIndexes, i)
-			}
-		} else {
+		} else if kstrctOk && kstrctTag != "-" {
 			fieldsIndexes = append(fieldsIndexes, i)
+		} else if len(valuesToFill) < rs.NumField() {
+			if i != 0 {
+				fieldsIndexes = append(fieldsIndexes, i)
+			}
 		}
 	}
 
@@ -36,22 +48,22 @@ func FillFromValues(struct_to_fill any, values_to_fill ...any) error {
 		idx := i
 		if ftag, ok := typeOfT.Field(fi).Tag.Lookup("korm"); ok {
 			if ftag == "pk" || ftag == "autoinc" || ftag == "-" || strings.Contains(ftag, "m2m") {
-				if len(values_to_fill) < len(fieldsIndexes) {
+				if len(valuesToFill) < len(fieldsIndexes) {
 					continue
 				}
 			}
 		} else if ftag, ok := typeOfT.Field(fi).Tag.Lookup("kstrct"); ok {
-			if ftag == "-" && len(values_to_fill) < len(fieldsIndexes) {
+			if ftag == "-" && len(valuesToFill) < len(fieldsIndexes) {
 				continue
 			}
 		}
 
 		field := rs.Field(fi)
 		if field.IsValid() {
-			if len(values_to_fill) < len(fieldsIndexes) {
+			if len(valuesToFill) < len(fieldsIndexes) {
 				idx = i - 1
 			}
-			err := SetReflectFieldValue(field, values_to_fill[idx])
+			err := SetReflectFieldValue(field, valuesToFill[idx])
 			if err != nil {
 				return err
 			}
@@ -86,27 +98,31 @@ func FillFromMap(struct_to_fill any, fields_values map[string]any) error {
 	return nil
 }
 
-func FillFromSelected(struct_to_fill any, fields_comma_separated string, values_to_fill ...any) error {
-	rs := reflect.ValueOf(struct_to_fill)
-	if rs.Kind() == reflect.Pointer {
-		rs = reflect.ValueOf(struct_to_fill).Elem()
+func FillFromSelected(structToFill interface{}, fieldsCommaSeparated string, valuesToFill ...interface{}) error {
+	rv := reflect.ValueOf(structToFill)
+	if rv.Kind() == reflect.Ptr {
+		rv = rv.Elem()
 	}
-	typeOfT := rs.Type()
+
+	rt := rv.Type()
+
 	skipped := 0
-	for i := 0; i < rs.NumField(); i++ {
-		if len(values_to_fill) < rs.NumField() && (!strings.Contains(fields_comma_separated, ToSnakeCase(typeOfT.Field(i).Name)) || !strings.Contains(fields_comma_separated, typeOfT.Field(i).Name)) {
+	for i := 0; i < rv.NumField(); i++ {
+		fieldName := ToSnakeCase(rt.Field(i).Name)
+		if fi := strings.Index(fieldsCommaSeparated, fieldName); fi == -1 {
 			skipped++
 			continue
 		}
-		field := rs.Field(i)
-		if field.IsValid() {
-			err := SetReflectFieldValue(field, values_to_fill[i-skipped])
-			if err != nil {
-				return err
-			}
-		} else {
-			return errors.New("FillFromValues error: " + ToSnakeCase(typeOfT.Field(i).Name) + " not valid")
+
+		field := rv.Field(i)
+		if !field.IsValid() {
+			return fmt.Errorf("FillFromValues error: %s not valid", fieldName)
+		}
+
+		if err := SetReflectFieldValue(field, valuesToFill[i-skipped]); err != nil {
+			return err
 		}
 	}
+
 	return nil
 }
