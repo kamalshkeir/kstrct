@@ -341,12 +341,12 @@ func SetReflectFieldValue(fld reflect.Value, value interface{}) error {
 						// Try to parse the date as either "2006-01-02T15:04" or "2006-01-02 15:04:05 or 2006-01-02 15:04:05.000000000 -0700 MST"
 						t, err := time.Parse("2006-01-02T15:04", v)
 						if err != nil {
+							if len(v) > 19 {
+								v = v[:19]
+							}
 							t, err = time.Parse("2006-01-02 15:04:05", v)
 							if err != nil {
-								t, err = time.Parse("2006-01-02 15:04:05.000000000 -0700 MST", v)
-								if err != nil {
-									return fmt.Errorf("failed to parse date: %v", err)
-								}
+								return fmt.Errorf("failed to parse date: %v", err)
 							}
 						}
 						fld.Set(reflect.ValueOf(t))
