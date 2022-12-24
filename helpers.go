@@ -336,7 +336,7 @@ func SetReflectFieldValue(fld reflect.Value, value interface{}) error {
 				switch v := value.(type) {
 				case string:
 					// Use a regular expression to match the desired date format
-					re := regexp.MustCompile(`^\d{4}[-/:]\d{2}[-/:]\d{2}(T\d{2}:\d{2})?$`)
+					re := regexp.MustCompile(`^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+ [+-]\d{4} [A-Z]{3} m=\+\d+\.\d+$`)
 					if re.MatchString(v) {
 						// Try to parse the date as either "2006-01-02T15:04" or "2006-01-02 15:04:05"
 						t, err := time.Parse("2006-01-02T15:04", v)
