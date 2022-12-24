@@ -3,7 +3,6 @@ package kstrct
 import (
 	"fmt"
 	"reflect"
-	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -336,23 +335,24 @@ func SetReflectFieldValue(fld reflect.Value, value interface{}) error {
 				switch v := value.(type) {
 				case string:
 					// Use a regular expression to match the desired date format
-					re := regexp.MustCompile(`^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+ [+-]\d{4} [A-Z]{3} m=\+\d+\.\d+$`)
-					if re.MatchString(v) {
-						// Try to parse the date as either "2006-01-02T15:04" or "2006-01-02 15:04:05 or 2006-01-02 15:04:05.000000000 -0700 MST"
-						t, err := time.Parse("2006-01-02T15:04", v)
-						if err != nil {
-							if len(v) > 19 {
-								v = v[:19]
+					if strings.Contains(v, ":") || strings.Contains(v, "-") {
+						l := len("2006-01-02T15:04")
+						if strings.Contains(v[:l], "T") {
+							if len(v) >= l {
+								t, err := time.Parse("2006-01-02T15:04", v[:l])
+								if err != nil {
+									fld.Set(reflect.ValueOf(t))
+								}
 							}
-							t, err = time.Parse("2006-01-02 15:04:05", v)
-							if err != nil {
-								return fmt.Errorf("failed to parse date: %v", err)
+						} else if len(v) >= len("2006-01-02 15:04:05") {
+							t, err := time.Parse("2006-01-02 15:04:05", v[:len("2006-01-02 15:04:05")])
+							if err == nil {
+								fld.Set(reflect.ValueOf(t))
 							}
+						} else {
+							return fmt.Errorf("invalid date format: %v", v)
 						}
-						fld.Set(reflect.ValueOf(t))
-						return nil
 					}
-					return fmt.Errorf("invalid date format: %v", v)
 				case time.Time:
 					fld.Set(reflect.ValueOf(v))
 					return nil
@@ -376,8 +376,8 @@ func SetReflectFieldValue(fld reflect.Value, value interface{}) error {
 					} else {
 						return fmt.Errorf("cannot assign value of type %s to field of type %s", vToSet.Type(), fld.Type())
 					}
-					return nil
 				}
+				return nil
 			},
 			reflect.Ptr: func(fld reflect.Value, value interface{}) error {
 				unwrapped := fld.Elem()
