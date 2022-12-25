@@ -256,11 +256,24 @@ func SetReflectFieldValue(fld reflect.Value, value interface{}) error {
 				return nil
 			},
 			reflect.Int: func(fld reflect.Value, value interface{}) error {
-				intVal, ok := value.(int)
-				if !ok {
-					return fmt.Errorf("expected int value, got %T", value)
+				switch v := value.(type) {
+				case int:
+					fld.SetInt(int64(v))
+				case int64:
+					fld.SetInt(v)
+				case string:
+					if v, err := strconv.Atoi(v); err == nil {
+						fld.SetInt(int64(v))
+					}
+				case uint:
+					fld.SetInt(int64(v))
+				case int32:
+					fld.SetInt(int64(v))
+				case uint64:
+					fld.SetInt(int64(v))
+				default:
+					return fmt.Errorf("expected int64 value, got %T", value)
 				}
-				fld.SetInt(int64(intVal))
 				return nil
 			},
 			reflect.Int8: func(fld reflect.Value, value interface{}) error {
@@ -318,12 +331,18 @@ func SetReflectFieldValue(fld reflect.Value, value interface{}) error {
 				switch v := value.(type) {
 				case int64:
 					fld.SetInt(v)
+				case int:
+					fld.SetInt(int64(v))
+				case uint:
+					fld.SetInt(int64(v))
+				case int32:
+					fld.SetInt(int64(v))
+				case uint64:
+					fld.SetInt(int64(v))
 				case string:
 					if v, err := strconv.Atoi(v); err == nil {
 						fld.SetInt(int64(v))
 					}
-				case int:
-					fld.SetInt(int64(v))
 				default:
 					return fmt.Errorf("expected int64 value, got %T", value)
 				}
