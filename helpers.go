@@ -194,7 +194,7 @@ func SetReflectFieldValue(fld reflect.Value, value interface{}) error {
 				switch v := value.(type) {
 				case bool:
 					fld.SetBool(v)
-				case int:
+				case int, int64, int32, uint, uint64, float32, float64, uint32:
 					fld.SetBool(v != 0)
 				case string:
 					if v == "1" || v == "true" {
@@ -204,8 +204,6 @@ func SetReflectFieldValue(fld reflect.Value, value interface{}) error {
 					} else {
 						return fmt.Errorf("invalid bool string value: %v", v)
 					}
-				case float64:
-					fld.SetBool(v != 0)
 				default:
 					return fmt.Errorf("expected bool, int, string, or float64 value, got %T", value)
 				}
