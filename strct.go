@@ -82,18 +82,11 @@ func FillFromMap(struct_to_fill any, fields_values map[string]any) error {
 	for k, v := range fields_values {
 		var field *reflect.Value
 		if f := rs.FieldByName(SnakeCaseToTitle(k)); f.IsValid() {
-			fmt.Println("FillFromMap: found snake:", SnakeCaseToTitle(k))
 			field = &f
 		} else if f := rs.FieldByName(k); f.IsValid() {
-			fmt.Println("FillFromMap: found k:", k)
 			field = &f
-		} else {
-			n := rs.FieldByName(SnakeCaseToTitle(k))
-			fmt.Println("FillFromMap: not found k:", k, SnakeCaseToTitle(k), n.IsValid())
-			fmt.Println(fields_values)
 		}
-
-		if !field.IsValid() {
+		if field == nil {
 			return errors.New("FillFromMap error: " + k + " not valid")
 		}
 		err := SetReflectFieldValue(*field, v)
