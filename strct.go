@@ -8,7 +8,8 @@ import (
 )
 
 var (
-	ErrorLength = errors.New("error FillSelectedValues: len(values_to_fill) and len(struct fields) should be the same")
+	ErrorLength      = errors.New("error FillSelectedValues: len(values_to_fill) and len(struct fields) should be the same")
+	ErrorExpectedPtr = errors.New("expected structToFill to be a pointer")
 )
 
 func FillFromValues(structToFill interface{}, valuesToFill ...interface{}) error {
@@ -74,11 +75,12 @@ func FillFromValues(structToFill interface{}, valuesToFill ...interface{}) error
 	return nil
 }
 
-func FillFromMap(struct_to_fill any, fields_values map[string]any) error {
-	rs := reflect.ValueOf(struct_to_fill)
-	if rs.Kind() == reflect.Pointer {
-		rs = reflect.ValueOf(struct_to_fill).Elem()
+func FillFromMap(structToFill any, fields_values map[string]any) error {
+	rs := reflect.ValueOf(structToFill)
+	if rs.Kind() != reflect.Pointer {
+		return ErrorExpectedPtr
 	}
+	rs = rs.Elem()
 	for k, v := range fields_values {
 		var field *reflect.Value
 		if f := rs.FieldByName(SnakeCaseToTitle(k)); f.IsValid() {
@@ -87,7 +89,7 @@ func FillFromMap(struct_to_fill any, fields_values map[string]any) error {
 			field = &f
 		}
 		if field == nil {
-			return errors.New("FillFromMap error: " + k + " not valid")
+			return fmt.Errorf("fillFromMap error: %s not valid", k)
 		}
 		err := SetReflectFieldValue(*field, v)
 		if err != nil {
@@ -99,10 +101,10 @@ func FillFromMap(struct_to_fill any, fields_values map[string]any) error {
 
 func FillFromSelected(structToFill interface{}, fieldsCommaSeparated string, valuesToFill ...interface{}) error {
 	rv := reflect.ValueOf(structToFill)
-	if rv.Kind() == reflect.Ptr {
-		rv = rv.Elem()
+	if rv.Kind() != reflect.Pointer {
+		return ErrorExpectedPtr
 	}
-
+	rv = rv.Elem()
 	rt := rv.Type()
 
 	skipped := 0
