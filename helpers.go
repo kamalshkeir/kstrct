@@ -272,7 +272,6 @@ func SetReflectFieldValue(fld reflect.Value, value interface{}) error {
 				l := len("2006-01-02T15:04")
 				if strings.Contains(v[:l], "T") {
 					if len(v) >= l {
-						fmt.Println("yes")
 						t, err := time.Parse("2006-01-02T15:04", v[:l])
 						if err != nil {
 							return err
