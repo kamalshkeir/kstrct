@@ -278,8 +278,8 @@ func SetReflectFieldValue(fld reflect.Value, value interface{}) error {
 						}
 						fld.Set(reflect.ValueOf(t))
 					}
-				} else if len(v) >= len("2006-01-02 15:04") {
-					t, err := time.Parse("2006-01-02 15:04", v[:len("2006-01-02 15:04")])
+				} else if len(v) >= len("2006-01-02T15:04") {
+					t, err := time.Parse("2006-01-02T15:04", v[:len("2006-01-02T15:04")])
 					if err != nil {
 						return err
 					}
