@@ -272,16 +272,19 @@ func SetReflectFieldValue(fld reflect.Value, value interface{}) error {
 				l := len("2006-01-02T15:04")
 				if strings.Contains(v[:l], "T") {
 					if len(v) >= l {
+						fmt.Println("yes")
 						t, err := time.Parse("2006-01-02T15:04", v[:l])
 						if err != nil {
-							fld.Set(reflect.ValueOf(t))
+							return err
 						}
-					}
-				} else if len(v) >= len("2006-01-02 15:04:05") {
-					t, err := time.Parse("2006-01-02 15:04:05", v[:len("2006-01-02 15:04:05")])
-					if err == nil {
 						fld.Set(reflect.ValueOf(t))
 					}
+				} else if len(v) >= len("2006-01-02 15:04") {
+					t, err := time.Parse("2006-01-02 15:04", v[:len("2006-01-02 15:04")])
+					if err != nil {
+						return err
+					}
+					fld.Set(reflect.ValueOf(t))
 				} else {
 					return fmt.Errorf("invalid date format: %v", v)
 				}

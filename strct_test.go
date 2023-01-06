@@ -108,3 +108,25 @@ func TestFillFromValues(t *testing.T) {
 		t.Error("failed", u)
 	}
 }
+
+type Custom struct {
+	Id         int
+	FieldTime  time.Time
+	FieldTime2 time.Time
+	FieldTime3 time.Time
+}
+
+func TestFillFromMap(t *testing.T) {
+	u := Custom{}
+
+	err := FillFromMap(&u, map[string]any{
+		"id":          5,
+		"field_time":  "2023-01-06T23:08",
+		"field_time2": "2023-01-06T23:08",
+		"field_time3": "2023-01-06T23:08",
+	})
+	if err != nil {
+		t.Error(err)
+	}
+	t.Log(u)
+}
