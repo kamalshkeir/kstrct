@@ -1,6 +1,7 @@
 package kstrct
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -179,6 +180,20 @@ func GetInfos[T comparable](strct *T, tagsToCheck ...string) *Info {
 }
 
 func SetReflectFieldValue(fld reflect.Value, value interface{}) error {
+	var errPanic error
+	defer func() {
+		if r := recover(); r != nil {
+			switch x := r.(type) {
+			case string:
+				errPanic = errors.New(x)
+			case error:
+				errPanic = x
+			default:
+				// Fallback err (per specs, error strings should be lowercase w/o punctuation
+				errPanic = fmt.Errorf("%v", r)
+			}
+		}
+	}()
 	vToSet := reflect.ValueOf(value)
 	if vToSet.Kind() == fld.Kind() {
 		fld.Set(vToSet)
@@ -201,7 +216,11 @@ func SetReflectFieldValue(fld reflect.Value, value interface{}) error {
 				return fmt.Errorf("invalid bool string value: %v", v)
 			}
 		default:
-			return fmt.Errorf("expected bool, int, string, or float64 value, got %T", value)
+			if vToSet.IsValid() {
+				fld.Set(vToSet)
+			} else {
+				fld.Set(reflect.Zero(fld.Type()))
+			}
 		}
 		return nil
 	case reflect.String:
@@ -214,7 +233,7 @@ func SetReflectFieldValue(fld reflect.Value, value interface{}) error {
 			if vToSet.IsValid() {
 				fld.Set(vToSet)
 			} else {
-				return fmt.Errorf("case struct SetReflectFieldValue got value %v which is not valid for fieldName : %s", value, fld.Type().Name())
+				fld.Set(reflect.Zero(fld.Type()))
 			}
 		}
 		return nil
@@ -237,7 +256,11 @@ func SetReflectFieldValue(fld reflect.Value, value interface{}) error {
 				fld.SetUint(uint64(v))
 			}
 		default:
-			return fmt.Errorf("expected uint uint64 int64 or int value, got %T %v", value, value)
+			if vToSet.IsValid() {
+				fld.Set(vToSet)
+			} else {
+				fld.Set(reflect.Zero(fld.Type()))
+			}
 		}
 		return nil
 	case reflect.Int, reflect.Int64, reflect.Int32, reflect.Int16, reflect.Int8:
@@ -261,7 +284,11 @@ func SetReflectFieldValue(fld reflect.Value, value interface{}) error {
 				fld.SetInt(int64(v))
 			}
 		default:
-			return fmt.Errorf("expected int64 value, got %T", value)
+			if vToSet.IsValid() {
+				fld.Set(vToSet)
+			} else {
+				fld.Set(reflect.Zero(fld.Type()))
+			}
 		}
 		return nil
 	case reflect.Struct:
@@ -335,7 +362,11 @@ func SetReflectFieldValue(fld reflect.Value, value interface{}) error {
 				fld.SetFloat(f64)
 			}
 		} else {
-			return fmt.Errorf("cannot set float64 from setReflectFieldValue :%T", value)
+			if vToSet.IsValid() {
+				fld.Set(vToSet)
+			} else {
+				fld.Set(reflect.Zero(fld.Type()))
+			}
 		}
 		return nil
 	case reflect.Interface:
@@ -383,6 +414,9 @@ func SetReflectFieldValue(fld reflect.Value, value interface{}) error {
 			}
 		}
 		return nil
+	}
+	if errPanic != nil {
+		return errPanic
 	}
 	return nil
 }

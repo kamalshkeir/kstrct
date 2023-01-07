@@ -110,7 +110,9 @@ func TestFillFromValues(t *testing.T) {
 }
 
 type Custom struct {
-	Id         int
+	Id         *int
+	Admin      *bool
+	Email      *string
 	FieldTime  time.Time
 	FieldTime2 time.Time
 	FieldTime3 time.Time
@@ -118,9 +120,10 @@ type Custom struct {
 
 func TestFillFromMap(t *testing.T) {
 	u := Custom{}
-
 	err := FillFromMap(&u, map[string]any{
-		"id":          5,
+		"id":          nil,
+		"admin":       nil,
+		"email":       nil,
 		"field_time":  "2023-01-06 23:08",
 		"field_time2": "2023-01-06 23:08",
 		"field_time3": "2023-01-06 23:08",
@@ -128,5 +131,5 @@ func TestFillFromMap(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	t.Log(u)
+	t.Logf("%v", u)
 }
