@@ -266,30 +266,23 @@ func SetReflectFieldValue(fld reflect.Value, value interface{}) error {
 		return nil
 	case reflect.Struct:
 		switch v := value.(type) {
+		case time.Time:
+			v.Format("2006-01-02T15:04")
+			fld.Set(reflect.ValueOf(v))
+			return nil
 		case string:
 			// Use a regular expression to match the desired date format
 			l := len("2006-01-02T15:04")
-			if strings.ContainsAny(v, ":-") && len(v) >= l {
-				v = strings.TrimSpace(v[:l])
-				if strings.Contains(v, "T") {
-					t, err := time.Parse("2006-01-02T15:04", v)
+			if len(v) >= l {
+				t, err := time.Parse("2006-01-02T15:04", v)
+				if err != nil {
+					t, err = time.Parse("2006-01-02T15:04", strings.Join(strings.Split(v, " "), "T"))
 					if err != nil {
 						return err
 					}
-					fld.Set(reflect.ValueOf(t))
-				} else if sp := strings.Split(v, " "); len(sp) == 2 {
-					t, err := time.Parse("2006-01-02T15:04", strings.Join(sp, "T"))
-					if err != nil {
-						return err
-					}
-					fld.Set(reflect.ValueOf(t))
-				} else {
-					return fmt.Errorf("invalid date format: %v", v)
 				}
+				fld.Set(reflect.ValueOf(t))
 			}
-		case time.Time:
-			fld.Set(reflect.ValueOf(v))
-			return nil
 		case []interface{}:
 			// Walk the fields
 			for i := 0; i < fld.NumField(); i++ {
