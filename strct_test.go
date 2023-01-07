@@ -121,9 +121,9 @@ func TestFillFromMap(t *testing.T) {
 
 	err := FillFromMap(&u, map[string]any{
 		"id":          5,
-		"field_time":  "2023-01-06T23:08",
-		"field_time2": "2023-01-06T23:08",
-		"field_time3": "2023-01-06T23:08",
+		"field_time":  "2023-01-06 23:08",
+		"field_time2": "2023-01-06 23:08",
+		"field_time3": "2023-01-06 23:08",
 	})
 	if err != nil {
 		t.Error(err)

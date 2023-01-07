@@ -268,18 +268,17 @@ func SetReflectFieldValue(fld reflect.Value, value interface{}) error {
 		switch v := value.(type) {
 		case string:
 			// Use a regular expression to match the desired date format
-			if strings.Contains(v, ":") || strings.Contains(v, "-") {
-				l := len("2006-01-02T15:04")
-				if strings.Contains(v[:l], "T") {
-					if len(v) >= l {
-						t, err := time.Parse("2006-01-02T15:04", v[:l])
-						if err != nil {
-							return err
-						}
-						fld.Set(reflect.ValueOf(t))
+			l := len("2006-01-02T15:04")
+			if strings.ContainsAny(v, ":-") && len(v) >= l {
+				v = strings.TrimSpace(v[:l])
+				if strings.Contains(v, "T") {
+					t, err := time.Parse("2006-01-02T15:04", v)
+					if err != nil {
+						return err
 					}
-				} else if len(v) >= len("2006-01-02T15:04") {
-					t, err := time.Parse("2006-01-02T15:04", v[:len("2006-01-02T15:04")])
+					fld.Set(reflect.ValueOf(t))
+				} else if sp := strings.Split(v, " "); len(sp) == 2 {
+					t, err := time.Parse("2006-01-02T15:04", strings.Join(sp, "T"))
 					if err != nil {
 						return err
 					}
