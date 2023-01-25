@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"strings"
+	"sync"
 )
 
 var (
@@ -97,6 +98,138 @@ func FillFromMap(structToFill any, fields_values map[string]any) error {
 		}
 	}
 	return nil
+}
+
+func FillFromMapS[T any](fields_values map[string]any) (T, error) {
+	ptr := new(T)
+	rs := reflect.ValueOf(ptr).Elem()
+
+	for k, v := range fields_values {
+		var field *reflect.Value
+		if f := rs.FieldByName(SnakeCaseToTitle(k)); f.IsValid() {
+			field = &f
+		} else if f := rs.FieldByName(k); f.IsValid() {
+			field = &f
+		}
+		if field == nil {
+			return *new(T), fmt.Errorf("fillFromMap error: %s not valid", k)
+		}
+		err := SetReflectFieldValue(*field, v)
+		if err != nil {
+			return *new(T), err
+		}
+	}
+	if ptr != new(T) {
+		return *ptr, nil
+	} else {
+		return *new(T), fmt.Errorf("pointer is nil")
+	}
+}
+
+// func FillMany[T any](manyRows ...map[string]any) ([]T, error) {
+// 	res := make([]T, len(manyRows))
+// 	errors := make([]error, len(manyRows))
+// 	resultsChan := make(chan T, len(manyRows))
+// 	errorsChan := make(chan error, len(manyRows))
+// 	wg := sync.WaitGroup{}
+// 	if len(manyRows) > 20 {
+// 		pool := NewPool(20)
+// 		defer pool.Wait()
+// 		wg.Add(len(manyRows))
+// 		for _, v := range manyRows {
+// 			pool.Submit(func() {
+// 				defer wg.Done()
+// 				u, err := FillFromMapS[T](v)
+// 				if err != nil {
+// 					errorsChan <- err
+// 					return
+// 				}
+// 				resultsChan <- u
+// 			})
+// 		}
+// 		for i := 0; i < len(manyRows); i++ {
+// 			select {
+// 			case res[i] = <-resultsChan:
+// 			case err := <-errorsChan:
+// 				errors[i] = err
+// 			}
+// 		}
+// 		wg.Wait()
+// 		close(resultsChan)
+// 		close(errorsChan)
+// 	} else {
+// 		for i, v := range manyRows {
+// 			u, err := FillFromMapS[T](v)
+// 			if err != nil {
+// 				fmt.Println("FillMany error:", err)
+// 				return nil, err
+// 			}
+// 			res[i] = u
+// 		}
+// 	}
+// 	return res, nil
+// }
+
+func FillManySync[T any](manyRows ...map[string]any) ([]T, error) {
+	res := make([]T, len(manyRows))
+	for i, v := range manyRows {
+		u, err := FillFromMapS[T](v)
+		if err != nil {
+			fmt.Println("FillMany error:", err)
+			return nil, err
+		}
+		res[i] = u
+	}
+	return res, nil
+}
+
+type FieldCtx struct {
+	NumFields int
+	Index     int
+	Field     reflect.Value
+	Name      string
+	Value     any
+	Type      string
+	Tags      []string
+}
+
+var fieldCtxPool = sync.Pool{
+	New: func() interface{} {
+		return &FieldCtx{
+			Tags: []string{},
+		}
+	},
+}
+
+func Range[T any](strctPtr *T, fn func(fCtx FieldCtx), tagsToGet ...string) T {
+	rs := reflect.ValueOf(strctPtr).Elem()
+	typeOfT := rs.Type()
+	numFields := rs.NumField()
+	for i := 0; i < numFields; i++ {
+		f := rs.Field(i)
+		fname := ToSnakeCase(typeOfT.Field(i).Name)
+
+		// Get a fieldCtx from the pool
+		ctx := fieldCtxPool.Get().(*FieldCtx)
+		val := f.Interface()
+		ctx.Field = f
+		ctx.Name = fname
+		ctx.Value = val
+		ctx.Type = reflect.TypeOf(val).Name()
+		ctx.NumFields = numFields
+		ctx.Index = i
+		ctx.Tags = ctx.Tags[:0]
+		for _, t := range tagsToGet {
+			if ftag, ok := typeOfT.Field(i).Tag.Lookup(t); ok {
+				ctx.Tags = append(ctx.Tags, ftag)
+			}
+		}
+		fn(*ctx)
+
+		// Put the fieldCtx back into the pool
+		fieldCtxPool.Put(ctx)
+	}
+	return *strctPtr
 }
 
 func FillFromSelected(structToFill interface{}, fieldsCommaSeparated string, valuesToFill ...interface{}) error {

@@ -324,6 +324,29 @@ func SetReflectFieldValue(fld reflect.Value, value interface{}) error {
 				}
 				fld.Set(reflect.ValueOf(t))
 			}
+		case *string:
+			// Use a regular expression to match the desired date format
+			*v = strings.ReplaceAll(*v, "T", " ")
+			long := false
+			if len(*v) >= len("2006-01-02 15:04:05") {
+				long = true
+				*v = (*v)[:len("2006-01-02 15:04:05")]
+			} else {
+				*v = (*v)[:len("2006-01-02 15:04")]
+			}
+			if long {
+				t, err := time.Parse("2006-01-02 15:04:05", *v)
+				if err != nil {
+					return err
+				}
+				fld.Set(reflect.ValueOf(t))
+			} else {
+				t, err := time.Parse("2006-01-02 15:04", *v)
+				if err != nil {
+					return err
+				}
+				fld.Set(reflect.ValueOf(t))
+			}
 		case []interface{}:
 			// Walk the fields
 			for i := 0; i < fld.NumField(); i++ {
