@@ -113,11 +113,15 @@ func GetInfos[T comparable](strct *T, tagsToCheck ...string) *Info {
 			fname := typeOfT.Field(i).Name
 			fname = ToSnakeCase(fname)
 			fvalue := f.Interface()
-			ftype := f.Type().Name()
+			ftype := f.Type()
 
 			*fields = append(*fields, fname)
 			values[fname] = fvalue
-			types[fname] = ftype
+			if ftype.Kind() == reflect.Ptr {
+				types[fname] = ftype.Elem().String()
+			} else {
+				types[fname] = ftype.String()
+			}
 			for _, t := range tagsToCheck {
 				if ftag, ok := typeOfT.Field(i).Tag.Lookup(t); ok {
 					tagList := strings.Split(ftag, ";")

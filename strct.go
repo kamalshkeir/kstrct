@@ -100,7 +100,7 @@ func FillFromMap(structToFill any, fields_values map[string]any) error {
 	return nil
 }
 
-func FillFromMapS[T any](fields_values map[string]any) (T, error) {
+func FillFromMapS[T any](fields_values map[string]any, model ...T) (T, error) {
 	ptr := new(T)
 	rs := reflect.ValueOf(ptr).Elem()
 
@@ -124,63 +124,6 @@ func FillFromMapS[T any](fields_values map[string]any) (T, error) {
 	} else {
 		return *new(T), fmt.Errorf("pointer is nil")
 	}
-}
-
-// func FillMany[T any](manyRows ...map[string]any) ([]T, error) {
-// 	res := make([]T, len(manyRows))
-// 	errors := make([]error, len(manyRows))
-// 	resultsChan := make(chan T, len(manyRows))
-// 	errorsChan := make(chan error, len(manyRows))
-// 	wg := sync.WaitGroup{}
-// 	if len(manyRows) > 20 {
-// 		pool := NewPool(20)
-// 		defer pool.Wait()
-// 		wg.Add(len(manyRows))
-// 		for _, v := range manyRows {
-// 			pool.Submit(func() {
-// 				defer wg.Done()
-// 				u, err := FillFromMapS[T](v)
-// 				if err != nil {
-// 					errorsChan <- err
-// 					return
-// 				}
-// 				resultsChan <- u
-// 			})
-// 		}
-// 		for i := 0; i < len(manyRows); i++ {
-// 			select {
-// 			case res[i] = <-resultsChan:
-// 			case err := <-errorsChan:
-// 				errors[i] = err
-// 			}
-// 		}
-// 		wg.Wait()
-// 		close(resultsChan)
-// 		close(errorsChan)
-// 	} else {
-// 		for i, v := range manyRows {
-// 			u, err := FillFromMapS[T](v)
-// 			if err != nil {
-// 				fmt.Println("FillMany error:", err)
-// 				return nil, err
-// 			}
-// 			res[i] = u
-// 		}
-// 	}
-// 	return res, nil
-// }
-
-func FillManySync[T any](manyRows ...map[string]any) ([]T, error) {
-	res := make([]T, len(manyRows))
-	for i, v := range manyRows {
-		u, err := FillFromMapS[T](v)
-		if err != nil {
-			fmt.Println("FillMany error:", err)
-			return nil, err
-		}
-		res[i] = u
-	}
-	return res, nil
 }
 
 type FieldCtx struct {

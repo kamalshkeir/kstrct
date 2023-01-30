@@ -79,52 +79,6 @@ func BenchmarkFillFromMap(b *testing.B) {
 	}
 }
 
-func BenchmarkFillManySync(b *testing.B) {
-	usersToInsert := []map[string]any{}
-	N := 100
-	for i := 0; i < N; i++ {
-		usersToInsert = append(usersToInsert, map[string]any{
-			"float_num": float64(i),
-			"created":   time.Now(),
-			"username":  "user",
-			"list":      "hello,bye",
-		})
-	}
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		users, err := FillManySync[User](usersToInsert...)
-		if err != nil {
-			b.Error(err)
-		}
-		if len(users) != N || users[1].FloatNum != float64(1) || users[1].Username != "user" || users[1].List[0] != "hello" {
-			b.Error("fail", users)
-		}
-	}
-}
-
-// func BenchmarkFillMany(b *testing.B) {
-// 	usersToInsert := []map[string]any{}
-// 	N := 100
-// 	for i := 0; i < N; i++ {
-// 		usersToInsert = append(usersToInsert, map[string]any{
-// 			"float_num": float64(i),
-// 			"created":   time.Now(),
-// 			"username":  "user",
-// 			"list":      "hello,bye",
-// 		})
-// 	}
-// 	b.ResetTimer()
-// 	for i := 0; i < b.N; i++ {
-// 		users, err := FillMany[User](usersToInsert...)
-// 		if err != nil {
-// 			b.Error(err)
-// 		}
-// 		if len(users) != N || users[1].FloatNum != float64(1) || users[1].Username != "user" || users[1].List[0] != "hello" {
-// 			b.Error("fail", users)
-// 		}
-// 	}
-// }
-
 type KormUser struct {
 	Id        int       `json:"id,omitempty"`
 	Uuid      string    `json:"uuid,omitempty" korm:"size:40;iunique"`
