@@ -305,6 +305,15 @@ func SetReflectFieldValue(fld reflect.Value, value interface{}) error {
 			}
 			fld.Set(reflect.ValueOf(v))
 			return nil
+		case int:
+			t := time.Unix(int64(v), 0)
+			fld.Set(reflect.ValueOf(t))
+		case uint:
+			t := time.Unix(int64(v), 0)
+			fld.Set(reflect.ValueOf(t))
+		case int64:
+			t := time.Unix(v, 0)
+			fld.Set(reflect.ValueOf(t))
 		case string:
 			// Use a regular expression to match the desired date format
 			v = strings.ReplaceAll(v, "T", " ")

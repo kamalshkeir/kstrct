@@ -1,6 +1,7 @@
 package kstrct
 
 import (
+	"fmt"
 	"testing"
 	"time"
 )
@@ -176,11 +177,13 @@ func TestFillFromMap(t *testing.T) {
 		"id":          nil,
 		"admin":       nil,
 		"email":       nil,
-		"field_time":  "2023-01-06 23:08",
-		"field_time2": "2023-01-06 23:08",
+		"field_time":  time.Now(),
+		"field_time2": time.Now().Unix(),
 		"field_time3": "2023-01-06 23:08",
 	})
 	if err != nil {
 		t.Error(err)
 	}
+	fmt.Println("--------------------")
+	fmt.Println(u)
 }
