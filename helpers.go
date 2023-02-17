@@ -11,6 +11,8 @@ import (
 	"unicode"
 )
 
+var Debug = false
+
 func ToSnakeCase(str string) string {
 	var result strings.Builder
 	var lastUpper bool
@@ -217,49 +219,16 @@ func SetReflectFieldValue(fld reflect.Value, value interface{}) error {
 			} else {
 				return fmt.Errorf("invalid bool string value: %v", v)
 			}
-		case int:
-			if value != 0 {
-				fld.SetBool(true)
-			} else {
-				fld.SetBool(false)
+		case int, int64, int32, uint, uint64, float32, float64, uint32:
+			// Convert numeric values to boolean values
+			if Debug {
+				fmt.Printf("value: %v, typeValue: %T %v \n", v, v, v == 0)
 			}
-		case int64:
-			if value != 0 {
-				fld.SetBool(true)
-			} else {
+			if v == 0 {
 				fld.SetBool(false)
-			}
-		case int32:
-			if value != 0 {
-				fld.SetBool(true)
 			} else {
-				fld.SetBool(false)
-			}
-		case uint:
-			if value != 0 {
 				fld.SetBool(true)
-			} else {
-				fld.SetBool(false)
 			}
-		case uint64:
-			if value != 0 {
-				fld.SetBool(true)
-			} else {
-				fld.SetBool(false)
-			}
-		case uint32:
-			if value != 0 {
-				fld.SetBool(true)
-			} else {
-				fld.SetBool(false)
-			}
-		case float64:
-			if value != float64(0) {
-				fld.SetBool(true)
-			} else {
-				fld.SetBool(false)
-			}
-		case float32:
 			if value != float32(0) {
 				fld.SetBool(true)
 			} else {
