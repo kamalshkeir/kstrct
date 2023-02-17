@@ -212,11 +212,19 @@ func SetReflectFieldValue(fld reflect.Value, value interface{}) error {
 		case bool:
 			fld.SetBool(v)
 		case int, int64, int32, uint, uint64, float32, float64, uint32:
-			if Debug {
-				fmt.Printf("trying to set number %v %T into bool field\n", v, v)
-				fmt.Println("v != 0", v != 0)
+			if v == 0 {
+				if Debug {
+					fmt.Printf("trying to set false for number %v %T into bool field\n", v, v)
+					fmt.Println("v != 0", v != 0)
+				}
+				fld.SetBool(false)
+			} else if v == 1 {
+				if Debug {
+					fmt.Printf("trying to set true for number %v %T into bool field\n", v, v)
+					fmt.Println("v != 0", v != 0)
+				}
+				fld.SetBool(true)
 			}
-			fld.SetBool(v != 0)
 		case string:
 			if Debug {
 				fmt.Printf("trying to set string %v %T into bool field\n", v, v)
