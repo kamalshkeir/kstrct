@@ -224,12 +224,12 @@ func SetReflectFieldValue(fld reflect.Value, value interface{}) error {
 			if Debug {
 				fmt.Printf("value: %v, typeValue: %T %v \n", v, v, v == 0)
 			}
-			if v == 0 {
+			if vToSet.Int() == 0 {
 				fld.SetBool(false)
 			} else {
 				fld.SetBool(true)
 			}
-			if value != float32(0) {
+			if float32(vToSet.Float()) != float32(0) {
 				fld.SetBool(true)
 			} else {
 				fld.SetBool(false)
