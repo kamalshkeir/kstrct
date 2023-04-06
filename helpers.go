@@ -205,7 +205,7 @@ func SetReflectFieldValue(fld reflect.Value, value interface{}) error {
 		fld.Set(vToSet)
 		return nil
 	}
-
+	var errReturn error
 	switch fld.Kind() {
 	case reflect.Bool:
 		switch v := value.(type) {
@@ -217,7 +217,7 @@ func SetReflectFieldValue(fld reflect.Value, value interface{}) error {
 			} else if v == "0" || v == "false" {
 				fld.SetBool(false)
 			} else {
-				return fmt.Errorf("invalid bool string value: %v", v)
+				errReturn = fmt.Errorf("invalid bool string value: %v", v)
 			}
 		case int, int64, int32, uint, uint64, float32, float64, uint32:
 			// Convert numeric values to boolean values
@@ -238,24 +238,28 @@ func SetReflectFieldValue(fld reflect.Value, value interface{}) error {
 			if vToSet.IsValid() {
 				fld.Set(vToSet)
 			} else {
+				errReturn = fmt.Errorf("zero value setted: cannot assign value of type %s to field of type %s", vToSet.Type(), fld.Type())
 				fld.Set(reflect.Zero(fld.Type()))
 			}
 		}
-		return nil
+		return errReturn
 	case reflect.String:
 		switch v := value.(type) {
 		case string:
 			fld.SetString(v)
 		case time.Time:
 			fld.SetString(v.String())
+		case float64, float32, int64, int32, uint, int, uint64, uint32:
+			fld.SetString(fmt.Sprintf("%v", v))
 		default:
 			if vToSet.IsValid() {
 				fld.Set(vToSet)
 			} else {
-				fld.Set(reflect.Zero(fld.Type()))
+				errReturn = fmt.Errorf("zero value setted: cannot assign value of type %s to field of type %s", vToSet.Type(), fld.Type())
+				fld.SetString(fmt.Sprintf("%v", v))
 			}
 		}
-		return nil
+		return errReturn
 	case reflect.Uint, reflect.Uint64, reflect.Uint32, reflect.Uint16, reflect.Uint8:
 		switch v := value.(type) {
 		case uint:
@@ -274,14 +278,19 @@ func SetReflectFieldValue(fld reflect.Value, value interface{}) error {
 			if v, err := strconv.Atoi(v); err == nil {
 				fld.SetUint(uint64(v))
 			}
+		case float64:
+			fld.SetUint(uint64(v))
+		case float32:
+			fld.SetUint(uint64(v))
 		default:
 			if vToSet.IsValid() {
 				fld.Set(vToSet)
 			} else {
+				errReturn = fmt.Errorf("zero value setted: cannot assign value of type %s to field of type %s", vToSet.Type(), fld.Type())
 				fld.Set(reflect.Zero(fld.Type()))
 			}
 		}
-		return nil
+		return errReturn
 	case reflect.Int, reflect.Int64, reflect.Int32, reflect.Int16, reflect.Int8:
 		switch v := value.(type) {
 		case int:
@@ -302,14 +311,19 @@ func SetReflectFieldValue(fld reflect.Value, value interface{}) error {
 			if v, err := strconv.Atoi(v); err == nil {
 				fld.SetInt(int64(v))
 			}
+		case float64:
+			fld.SetUint(uint64(v))
+		case float32:
+			fld.SetUint(uint64(v))
 		default:
 			if vToSet.IsValid() {
 				fld.Set(vToSet)
 			} else {
+				errReturn = fmt.Errorf("zero value setted: cannot assign value of type %s to field of type %s", vToSet.Type(), fld.Type())
 				fld.Set(reflect.Zero(fld.Type()))
 			}
 		}
-		return nil
+		return errReturn
 	case reflect.Struct:
 		switch v := value.(type) {
 		case time.Time:
@@ -352,6 +366,7 @@ func SetReflectFieldValue(fld reflect.Value, value interface{}) error {
 				}
 				fld.Set(reflect.ValueOf(t))
 			}
+			return errReturn
 		case *string:
 			// Use a regular expression to match the desired date format
 			*v = strings.ReplaceAll(*v, "T", " ")
@@ -375,6 +390,7 @@ func SetReflectFieldValue(fld reflect.Value, value interface{}) error {
 				}
 				fld.Set(reflect.ValueOf(t))
 			}
+			return errReturn
 		case []interface{}:
 			// Walk the fields
 			for i := 0; i < fld.NumField(); i++ {
@@ -468,6 +484,9 @@ func SetReflectFieldValue(fld reflect.Value, value interface{}) error {
 	}
 	if errPanic != nil {
 		return errPanic
+	}
+	if errReturn != nil {
+		return errReturn
 	}
 	return nil
 }
