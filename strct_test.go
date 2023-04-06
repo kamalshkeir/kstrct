@@ -187,3 +187,65 @@ func TestFillFromMap(t *testing.T) {
 	fmt.Println("--------------------")
 	fmt.Println(u)
 }
+
+type Something struct {
+	Id    int
+	Email string
+	Admin bool `kname:"is_admin"`
+}
+
+func TestFillFromMap2(t *testing.T) {
+	a := Something{}
+	err := FillFromMap(&a, map[string]any{
+		"id":       1,
+		"email":    "something",
+		"is_admin": true,
+	})
+	if err != nil {
+		t.Error(err)
+	}
+	fmt.Println("--------------------")
+	fmt.Println(a)
+}
+
+func TestFillFromMapSNewwww(t *testing.T) {
+	a, err := FillFromMapS[Something](map[string]any{
+		"id":    1,
+		"email": "something",
+		"admin": true,
+	})
+	if err != nil {
+		t.Error(err)
+	}
+	fmt.Println("--------------------")
+	fmt.Println(a)
+}
+
+func BenchmarkFillFromMapNew(b *testing.B) {
+	a := Something{}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		err := FillFromMap(&a, map[string]any{
+			"id":    1,
+			"email": "something",
+			"admin": true,
+		})
+		if err != nil {
+			b.Error(err)
+		}
+	}
+}
+
+func BenchmarkFillFromMapSNew(b *testing.B) {
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, err := FillFromMapS[Something](map[string]any{
+			"id":    1,
+			"email": "something",
+			"admin": true,
+		})
+		if err != nil {
+			b.Error(err)
+		}
+	}
+}

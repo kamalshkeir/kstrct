@@ -76,51 +76,65 @@ func FillFromValues(structToFill interface{}, valuesToFill ...interface{}) error
 	return nil
 }
 
-func FillFromMap(structToFill any, fields_values map[string]any) error {
+func FillFromMap(structToFill any, fields_values map[string]any) (err error) {
 	rs := reflect.ValueOf(structToFill)
 	if rs.Kind() != reflect.Pointer {
 		return ErrorExpectedPtr
 	}
 	rs = rs.Elem()
-	for k, v := range fields_values {
-		var field *reflect.Value
-		if f := rs.FieldByName(SnakeCaseToTitle(k)); f.IsValid() {
-			field = &f
-		} else if f := rs.FieldByName(k); f.IsValid() {
-			field = &f
-		}
-		if field == nil {
-			return fmt.Errorf("fillFromMap error: %s not valid", k)
-		}
-		err := SetReflectFieldValue(*field, v)
-		if err != nil {
-			return err
+	rt := rs.Type()
+	for i := 0; i < rs.NumField(); i++ {
+		field := rs.Field(i)
+		fname := rt.Field(i).Name
+
+		if v, ok := fields_values[ToSnakeCase(fname)]; ok {
+			err = SetReflectFieldValue(field, v)
+			if err != nil {
+				return err
+			}
+		} else if kstrctTag, ok := rt.Field(i).Tag.Lookup("kname"); ok {
+			if kstrctTag == "-" {
+				continue
+			}
+			if v, ok := fields_values[kstrctTag]; ok {
+				err = SetReflectFieldValue(field, v)
+				if err != nil {
+					return err
+				}
+			}
 		}
 	}
-	return nil
+	return err
 }
 
 func FillFromMapS[T any](fields_values map[string]any, model ...T) (T, error) {
 	ptr := new(T)
 	rs := reflect.ValueOf(ptr).Elem()
+	var err error
+	rt := rs.Type()
+	for i := 0; i < rs.NumField(); i++ {
+		field := rs.Field(i)
+		fname := rt.Field(i).Name
 
-	for k, v := range fields_values {
-		var field *reflect.Value
-		if f := rs.FieldByName(SnakeCaseToTitle(k)); f.IsValid() {
-			field = &f
-		} else if f := rs.FieldByName(k); f.IsValid() {
-			field = &f
-		}
-		if field == nil {
-			return *new(T), fmt.Errorf("fillFromMap error: %s not valid", k)
-		}
-		err := SetReflectFieldValue(*field, v)
-		if err != nil {
-			return *new(T), err
+		if v, ok := fields_values[ToSnakeCase(fname)]; ok {
+			err = SetReflectFieldValue(field, v)
+			if err != nil {
+				return *ptr, err
+			}
+		} else if kstrctTag, ok := rt.Field(i).Tag.Lookup("kname"); ok {
+			if kstrctTag == "-" {
+				continue
+			}
+			if v, ok := fields_values[kstrctTag]; ok {
+				err = SetReflectFieldValue(field, v)
+				if err != nil {
+					return *ptr, err
+				}
+			}
 		}
 	}
 	if ptr != new(T) {
-		return *ptr, nil
+		return *ptr, err
 	} else {
 		return *new(T), fmt.Errorf("pointer is nil")
 	}

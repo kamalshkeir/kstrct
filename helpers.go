@@ -239,7 +239,6 @@ func SetReflectFieldValue(fld reflect.Value, value interface{}) error {
 				fld.Set(vToSet)
 			} else {
 				errReturn = fmt.Errorf("zero value setted: cannot assign value of type %s to field of type %s", vToSet.Type(), fld.Type())
-				fld.Set(reflect.Zero(fld.Type()))
 			}
 		}
 		return errReturn
@@ -255,7 +254,7 @@ func SetReflectFieldValue(fld reflect.Value, value interface{}) error {
 			if vToSet.IsValid() {
 				fld.Set(vToSet)
 			} else {
-				errReturn = fmt.Errorf("zero value setted: cannot assign value of type %s to field of type %s", vToSet.Type(), fld.Type())
+				errReturn = fmt.Errorf("sprintf value setted: cannot assign value of type %s to field of type %s", vToSet.Type(), fld.Type())
 				fld.SetString(fmt.Sprintf("%v", v))
 			}
 		}
@@ -287,7 +286,6 @@ func SetReflectFieldValue(fld reflect.Value, value interface{}) error {
 				fld.Set(vToSet)
 			} else {
 				errReturn = fmt.Errorf("zero value setted: cannot assign value of type %s to field of type %s", vToSet.Type(), fld.Type())
-				fld.Set(reflect.Zero(fld.Type()))
 			}
 		}
 		return errReturn
@@ -320,7 +318,6 @@ func SetReflectFieldValue(fld reflect.Value, value interface{}) error {
 				fld.Set(vToSet)
 			} else {
 				errReturn = fmt.Errorf("zero value setted: cannot assign value of type %s to field of type %s", vToSet.Type(), fld.Type())
-				fld.Set(reflect.Zero(fld.Type()))
 			}
 		}
 		return errReturn
