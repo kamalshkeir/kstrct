@@ -8,49 +8,9 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"unicode"
 )
 
 var Debug = false
-
-func ToSnakeCase(str string) string {
-	var result strings.Builder
-	var lastUpper bool
-	for i, c := range str {
-		if c >= 'A' && c <= 'Z' {
-			if i > 0 && !lastUpper {
-				result.WriteRune('_')
-			}
-			lastUpper = true
-			result.WriteRune(unicode.ToLower(c))
-		} else {
-			lastUpper = false
-			result.WriteRune(c)
-		}
-	}
-	return result.String()
-}
-
-func SnakeCaseToTitle(inputUnderScoreStr string) (camelCase string) {
-	// snake_case to camelCase
-	var buffer strings.Builder
-	var nextUpper bool
-	for i, r := range inputUnderScoreStr {
-		if r == '_' {
-			nextUpper = true
-			continue
-		}
-		if nextUpper || i == 0 {
-			buffer.WriteRune(unicode.ToUpper(r))
-			nextUpper = false
-		} else {
-			buffer.WriteRune(r)
-		}
-	}
-	return buffer.String()
-}
-
-// GET INFO STRUCT
 
 // fieldsPool is a sync.Pool that can be used to avoid allocating
 // new slices on each call to the GetInfos function.
