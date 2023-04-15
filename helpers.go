@@ -282,110 +282,100 @@ func SetReflectFieldValue(fld reflect.Value, value interface{}, isTime ...bool) 
 		}
 		return errReturn
 	case reflect.Struct:
-		if len(isTime) > 0 && isTime[0] {
-			switch v := value.(type) {
-			case time.Time:
-				if len(v.String()) >= len("2006-01-02 15:04:05") {
-					v.Format("2006-01-02 15:04:05")
-				} else {
-					v.Format("2006-01-02 15:04")
-				}
-				fld.Set(reflect.ValueOf(v))
-				return nil
-			case int:
-				t := time.Unix(int64(v), 0)
-				fld.Set(reflect.ValueOf(t))
-			case uint:
-				t := time.Unix(int64(v), 0)
-				fld.Set(reflect.ValueOf(t))
-			case int64:
-				t := time.Unix(v, 0)
-				fld.Set(reflect.ValueOf(t))
-			case string:
-				// Use a regular expression to match the desired date format
-				v = strings.ReplaceAll(v, "T", " ")
-				long := false
-				if len(v) >= len("2006-01-02 15:04:05") {
-					long = true
-					v = v[:len("2006-01-02 15:04:05")]
-				} else {
-					v = v[:len("2006-01-02 15:04")]
-				}
-				if long {
-					t, err := time.Parse("2006-01-02 15:04:05", v)
+		switch v := value.(type) {
+		case map[string]any:
+			for i := 0; i < fld.NumField(); i++ {
+				field := fld.Field(i)
+				tfield := fld.Type().Field(i)
+				fname := tfield.Name
+				if neww, ok := v[ToSnakeCase(fname)]; ok {
+					err := SetReflectFieldValue(field, neww)
 					if err != nil {
 						return err
 					}
-					fld.Set(reflect.ValueOf(t))
-				} else {
-					t, err := time.Parse("2006-01-02 15:04", v)
-					if err != nil {
-						return err
+				} else if kstrctTag, ok := tfield.Tag.Lookup("kname"); ok {
+					if kstrctTag == "-" {
+						continue
 					}
-					fld.Set(reflect.ValueOf(t))
-				}
-				return errReturn
-			default:
-				if vToSet.Type().AssignableTo(fld.Type()) {
-					fld.Set(vToSet)
-				} else {
-					return fmt.Errorf("cannot assign value of type %s to field of type %s", vToSet.Type(), fld.Type())
-				}
-			}
-		} else {
-			switch v := value.(type) {
-			case map[string]any:
-				for i := 0; i < fld.NumField(); i++ {
-					field := fld.Field(i)
-					tfield := fld.Type().Field(i)
-					fname := tfield.Name
-					if neww, ok := v[ToSnakeCase(fname)]; ok {
-						err := SetReflectFieldValue(field, neww)
+					if val, ok := v[kstrctTag]; ok {
+						err := SetReflectFieldValue(field, val)
 						if err != nil {
 							return err
 						}
-					} else if kstrctTag, ok := tfield.Tag.Lookup("kname"); ok {
-						if kstrctTag == "-" {
-							continue
-						}
-						if val, ok := v[kstrctTag]; ok {
-							err := SetReflectFieldValue(field, val)
-							if err != nil {
-								return err
-							}
-						}
-					} else {
-						return fmt.Errorf("field not found %s", fname)
 					}
-				}
-			case map[int]any:
-				for i, value := range v {
-					field := fld.Field(i)
-					err := SetReflectFieldValue(field, value)
-					if err != nil {
-						return err
-					}
-				}
-			case []interface{}:
-				// Walk the fields
-				for i := 0; i < fld.NumField(); i++ {
-					if err := SetReflectFieldValue(fld.Field(i), v[i]); err != nil {
-						return err
-					}
-				}
-				return errReturn
-			default:
-				if vToSet.Type().AssignableTo(fld.Type()) {
-					fld.Set(vToSet)
-				} else if vToSet.Kind() == reflect.Slice {
-					// Convert the value slice to a slice of the correct element type
-					sliceType := reflect.SliceOf(fld.Type().Elem())
-					convertedSlice := reflect.MakeSlice(sliceType, vToSet.Len(), vToSet.Cap())
-					reflect.Copy(convertedSlice, vToSet)
-					fld.Set(convertedSlice)
 				} else {
-					return fmt.Errorf("cannot assign value of type %s to field of type %s", vToSet.Type(), fld.Type())
+					return fmt.Errorf("field not found %s", fname)
 				}
+			}
+		case map[int]any:
+			for i, value := range v {
+				field := fld.Field(i)
+				err := SetReflectFieldValue(field, value)
+				if err != nil {
+					return err
+				}
+			}
+		case time.Time:
+			if len(v.String()) >= len("2006-01-02 15:04:05") {
+				v.Format("2006-01-02 15:04:05")
+			} else {
+				v.Format("2006-01-02 15:04")
+			}
+			fld.Set(reflect.ValueOf(v))
+			return nil
+		case int64:
+			t := time.Unix(v, 0)
+			fld.Set(reflect.ValueOf(t))
+		case int:
+			t := time.Unix(int64(v), 0)
+			fld.Set(reflect.ValueOf(t))
+		case uint:
+			t := time.Unix(int64(v), 0)
+			fld.Set(reflect.ValueOf(t))
+		case string:
+			// Use a regular expression to match the desired date format
+			v = strings.ReplaceAll(v, "T", " ")
+			long := false
+			if len(v) >= len("2006-01-02 15:04:05") {
+				long = true
+				v = v[:len("2006-01-02 15:04:05")]
+			} else {
+				v = v[:len("2006-01-02 15:04")]
+			}
+			if long {
+				t, err := time.Parse("2006-01-02 15:04:05", v)
+				if err != nil {
+					return err
+				}
+				fld.Set(reflect.ValueOf(t))
+			} else {
+				t, err := time.Parse("2006-01-02 15:04", v)
+				if err != nil {
+					return err
+				}
+				fld.Set(reflect.ValueOf(t))
+			}
+			return errReturn
+
+		case []interface{}:
+			// Walk the fields
+			for i := 0; i < fld.NumField(); i++ {
+				if err := SetReflectFieldValue(fld.Field(i), v[i]); err != nil {
+					return err
+				}
+			}
+			return errReturn
+		default:
+			if vToSet.Type().AssignableTo(fld.Type()) {
+				fld.Set(vToSet)
+			} else if vToSet.Kind() == reflect.Slice {
+				// Convert the value slice to a slice of the correct element type
+				sliceType := reflect.SliceOf(fld.Type().Elem())
+				convertedSlice := reflect.MakeSlice(sliceType, vToSet.Len(), vToSet.Cap())
+				reflect.Copy(convertedSlice, vToSet)
+				fld.Set(convertedSlice)
+			} else {
+				return fmt.Errorf("cannot assign value of type %s to field of type %s", vToSet.Type(), fld.Type())
 			}
 		}
 		return errReturn
