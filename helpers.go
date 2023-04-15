@@ -299,6 +299,8 @@ func SetReflectFieldValue(fld reflect.Value, value interface{}, isTime ...bool) 
 				t := time.Unix(int64(v), 0)
 				fld.Set(reflect.ValueOf(t))
 			case int64:
+				t := time.Unix(v, 0)
+				fld.Set(reflect.ValueOf(t))
 			case string:
 				// Use a regular expression to match the desired date format
 				v = strings.ReplaceAll(v, "T", " ")
