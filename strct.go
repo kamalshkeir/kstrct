@@ -15,9 +15,22 @@ var (
 	cacheFieldsIndex = kmap.New[string, map[int]string](false)
 )
 
-func FillFromMap(structPointer any, fields_values map[string]any) (err error) {
-	rs := reflect.ValueOf(structPointer)
-	if rs.Kind() != reflect.Pointer {
+func FillFromMap(structOrChanPtr any, fields_values map[string]any) (err error) {
+	rs := reflect.ValueOf(structOrChanPtr)
+	if rs.Kind() != reflect.Pointer && rs.Kind() == reflect.Struct {
+		return ErrorExpectedPtr
+	} else if rs.Kind() == reflect.Chan || rs.Elem().Kind() == reflect.Chan {
+		if rs.Kind() == reflect.Pointer {
+			rs = rs.Elem()
+		}
+		chanType := reflect.New(rs.Type().Elem()).Elem()
+		err := SetReflectFieldValue(chanType, fields_values)
+		if err != nil {
+			return err
+		}
+		rs.Send(chanType)
+		return nil
+	} else if rs.Kind() == reflect.Struct {
 		return ErrorExpectedPtr
 	}
 	rs = rs.Elem()
@@ -62,10 +75,21 @@ func FillFromMap(structPointer any, fields_values map[string]any) (err error) {
 	return err
 }
 
-func FillByIndex(structPointer any, fields_values map[int]any) (err error) {
-	rs := reflect.ValueOf(structPointer)
-	if rs.Kind() != reflect.Pointer {
+func FillByIndex(structOrChanPtr any, fields_values map[int]any) (err error) {
+	rs := reflect.ValueOf(structOrChanPtr)
+	if rs.Kind() != reflect.Pointer && rs.Kind() == reflect.Struct {
 		return ErrorExpectedPtr
+	} else if rs.Kind() == reflect.Chan || reflect.ValueOf(structOrChanPtr).Kind() == reflect.Chan {
+		if rs.Kind() == reflect.Pointer {
+			rs = rs.Elem()
+		}
+		chanType := reflect.New(rs.Type().Elem()).Elem()
+		err := SetReflectFieldValue(chanType, fields_values)
+		if err != nil {
+			return err
+		}
+		rs.Send(chanType)
+		return nil
 	}
 	rs = rs.Elem()
 	for i := range fields_values {
@@ -78,8 +102,20 @@ func FillByIndex(structPointer any, fields_values map[int]any) (err error) {
 	return err
 }
 
-func FillFromMapS[T any](structPointer *T, fields_values map[string]any) (err error) {
-	rs := reflect.ValueOf(structPointer).Elem()
+func FillFromMapS[T any](structOrChanPtr *T, fields_values map[string]any) (err error) {
+	rs := reflect.ValueOf(structOrChanPtr).Elem()
+	if rs.Kind() == reflect.Chan || reflect.ValueOf(structOrChanPtr).Kind() == reflect.Chan {
+		if rs.Kind() == reflect.Pointer {
+			rs = rs.Elem()
+		}
+		chanType := reflect.New(rs.Type().Elem()).Elem()
+		err := SetReflectFieldValue(chanType, fields_values)
+		if err != nil {
+			return err
+		}
+		rs.Send(chanType)
+		return nil
+	}
 	rt := rs.Type()
 	strctName := rt.Name()
 	indexes, ok := cacheFieldsIndex.Get(strctName)
@@ -118,7 +154,7 @@ func FillFromMapS[T any](structPointer *T, fields_values map[string]any) (err er
 			}
 		}
 	}
-	if structPointer != new(T) {
+	if structOrChanPtr != new(T) {
 		return err
 	} else {
 		return fmt.Errorf("pointer is nil")

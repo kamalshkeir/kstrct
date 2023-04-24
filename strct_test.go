@@ -12,10 +12,9 @@ type Something struct {
 	CreatedAt time.Time
 }
 
-// BenchmarkFillFromMap-4           1555278               750.4 ns/op            96 B/op          9 allocs/op
-// BenchmarkFillFromMapS-4          1444975               833.0 ns/op           160 B/op         10 allocs/op
-// BenchmarkFillFromSelected-4      1816222               661.2 ns/op            96 B/op          9 allocs/op
-// BenchmarkFillByIndex-4           3098342               377.7 ns/op            24 B/op          1 allocs/op
+// BenchmarkFillFromMap-4           1757280               662.4 ns/op           360 B/op          3 allocs/op
+// BenchmarkFillFromMapS-4          1893105               618.1 ns/op           360 B/op          3 allocs/op
+// BenchmarkFillByIndex-4           2991378               384.6 ns/op            24 B/op          1 allocs/op
 
 func BenchmarkFillFromMap(b *testing.B) {
 	t := time.Now()

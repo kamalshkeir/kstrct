@@ -316,11 +316,6 @@ func SetReflectFieldValue(fld reflect.Value, value interface{}, isTime ...bool) 
 				}
 			}
 		case time.Time:
-			if len(v.String()) >= len("2006-01-02 15:04:05") {
-				v.Format("2006-01-02 15:04:05")
-			} else {
-				v.Format("2006-01-02 15:04")
-			}
 			fld.Set(reflect.ValueOf(v))
 			return nil
 		case int64:
