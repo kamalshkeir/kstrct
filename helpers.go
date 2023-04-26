@@ -304,7 +304,7 @@ func SetReflectFieldValue(fld reflect.Value, value interface{}, isTime ...bool) 
 						}
 					}
 				} else {
-					return fmt.Errorf("field not found %s", fname)
+					continue
 				}
 			}
 		case map[int]any:
