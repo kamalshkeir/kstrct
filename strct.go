@@ -30,8 +30,6 @@ func FillFromMap(structOrChanPtr any, fields_values map[string]any) (err error) 
 		}
 		rs.Send(chanType)
 		return nil
-	} else if rs.Kind() == reflect.Struct {
-		return ErrorExpectedPtr
 	}
 	rs = rs.Elem()
 	rt := rs.Type()
@@ -57,7 +55,7 @@ func FillFromMap(structOrChanPtr any, fields_values map[string]any) (err error) 
 			}
 			continue
 		}
-		if rs.Kind() == reflect.Struct {
+		if field.Kind() == reflect.Struct || field.Kind() == reflect.Ptr {
 			cp := make(map[string]any)
 			for name, val := range fields_values {
 				if sp := strings.Split(name, "."); len(sp) == 2 {
@@ -139,7 +137,7 @@ func FillFromMapS[T any](structOrChanPtr *T, fields_values map[string]any) (err 
 			}
 			continue
 		}
-		if rs.Kind() == reflect.Struct {
+		if field.Kind() == reflect.Struct || field.Kind() == reflect.Ptr {
 			cp := make(map[string]any)
 			for name, val := range fields_values {
 				if sp := strings.Split(name, "."); len(sp) == 2 {
