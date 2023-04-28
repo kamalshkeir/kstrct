@@ -31,7 +31,6 @@ func FillFromMap(structOrChanPtr any, fields_values map[string]any) (err error) 
 		rs.Send(chanType)
 		return nil
 	}
-
 	if rs.Kind() == reflect.Ptr {
 		rs = rs.Elem()
 		if rs.Kind() == reflect.Ptr {
@@ -61,9 +60,11 @@ func FillFromMap(structOrChanPtr any, fields_values map[string]any) (err error) 
 		} else {
 			fname = vf
 		}
+
 		if v, ok := fields_values[fname]; ok {
 			setErr := SetReflectFieldValue(field, v)
 			if setErr != nil {
+				fmt.Println("SetError:", err)
 				err = errors.Join(err, setErr)
 			}
 			continue

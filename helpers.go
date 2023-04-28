@@ -329,26 +329,32 @@ func SetReflectFieldValue(fld reflect.Value, value interface{}, isTime ...bool) 
 			fld.Set(reflect.ValueOf(t))
 		case string:
 			// Use a regular expression to match the desired date format
-			v = strings.ReplaceAll(v, "T", " ")
-			long := false
-			if len(v) >= len("2006-01-02 15:04:05") {
-				long = true
-				v = v[:len("2006-01-02 15:04:05")]
-			} else {
-				v = v[:len("2006-01-02 15:04")]
-			}
-			if long {
-				t, err := time.Parse("2006-01-02 15:04:05", v)
-				if err != nil {
-					return err
+			if strings.Contains(v, ":") {
+				v = strings.ReplaceAll(v, "T", " ")
+				long := false
+				if len(v) >= len("2006-01-02 15:04:05") {
+					long = true
+					v = v[:len("2006-01-02 15:04:05")]
+				} else {
+					v = v[:len("2006-01-02 15:04")]
 				}
-				fld.Set(reflect.ValueOf(t))
-			} else {
-				t, err := time.Parse("2006-01-02 15:04", v)
-				if err != nil {
-					return err
+				if long {
+					t, err := time.Parse("2006-01-02 15:04:05", v)
+					if err != nil {
+						fmt.Println("error set reflect time long:", err)
+						return err
+					}
+					fld.Set(reflect.ValueOf(t))
+				} else {
+					t, err := time.Parse("2006-01-02 15:04", v)
+					if err != nil {
+						fmt.Println("error set reflect time short:", err)
+						return err
+					}
+					fld.Set(reflect.ValueOf(t))
 				}
-				fld.Set(reflect.ValueOf(t))
+			} else {
+				fld.Set(vToSet)
 			}
 			return errReturn
 
