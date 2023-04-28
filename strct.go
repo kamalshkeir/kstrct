@@ -31,17 +31,27 @@ func FillFromMap(structOrChanPtr any, fields_values map[string]any) (err error) 
 		rs.Send(chanType)
 		return nil
 	}
-	rs = rs.Elem()
+
 	if rs.Kind() == reflect.Ptr {
+		rs = rs.Elem()
+		if rs.Kind() == reflect.Ptr {
+			rs = reflect.New(rs.Type().Elem()).Elem()
+		}
+	} else {
 		rs = rs.Elem()
 	}
 	rt := rs.Type()
 	strctName := rt.Name()
 	indexes, ok := cacheFieldsIndex.Get(strctName)
 	if !ok {
-		indexes = make(map[int]string, rs.NumField())
+		if rs.Kind() == reflect.Ptr {
+			indexes = make(map[int]string)
+		} else {
+			indexes = make(map[int]string)
+		}
 		cacheFieldsIndex.Set(strctName, indexes)
 	}
+
 	for i := 0; i < rs.NumField(); i++ {
 		field := rs.Field(i)
 		var fname string
@@ -116,6 +126,9 @@ func FillFromMapS[T any](structOrChanPtr *T, fields_values map[string]any) (err 
 		}
 		rs.Send(chanType)
 		return nil
+	}
+	if rs.Kind() == reflect.Ptr {
+		rs = reflect.New(rs.Type().Elem()).Elem()
 	}
 	rt := rs.Type()
 	strctName := rt.Name()
