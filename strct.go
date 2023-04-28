@@ -32,6 +32,9 @@ func FillFromMap(structOrChanPtr any, fields_values map[string]any) (err error) 
 		return nil
 	}
 	rs = rs.Elem()
+	if rs.Kind() == reflect.Ptr {
+		rs = rs.Elem()
+	}
 	rt := rs.Type()
 	strctName := rt.Name()
 	indexes, ok := cacheFieldsIndex.Get(strctName)
