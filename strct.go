@@ -69,7 +69,7 @@ func FillFromMap(structOrChanPtr any, fields_values map[string]any) (err error) 
 			}
 			continue
 		}
-		if field.Kind() == reflect.Struct || field.Kind() == reflect.Ptr {
+		if field.Kind() == reflect.Struct || (field.Kind() == reflect.Ptr && field.Elem().Kind() == reflect.Struct) {
 			cp := make(map[string]any)
 			for name, val := range fields_values {
 				if sp := strings.Split(name, "."); len(sp) == 2 {
@@ -81,6 +81,22 @@ func FillFromMap(structOrChanPtr any, fields_values map[string]any) (err error) 
 			if len(cp) > 0 {
 				setErr := SetReflectFieldValue(field, cp)
 				err = errors.Join(err, setErr)
+			}
+		} else if field.Kind() == reflect.Slice {
+			cp := make(map[string]any)
+			for name, val := range fields_values {
+				if sp := strings.Split(name, "."); len(sp) == 2 {
+					if sp[0] == fname || sp[0] == strctName {
+						cp[sp[1]] = val
+					}
+				}
+			}
+			var newElem reflect.Value
+			if len(cp) > 0 {
+				newElem = reflect.New(field.Type().Elem()).Elem()
+				setErr := SetReflectFieldValue(newElem, cp)
+				err = errors.Join(err, setErr)
+				field.Set(reflect.Append(field, newElem))
 			}
 		}
 	}
@@ -166,6 +182,22 @@ func FillFromMapS[T any](structOrChanPtr *T, fields_values map[string]any) (err 
 			if len(cp) > 0 {
 				setErr := SetReflectFieldValue(field, cp)
 				err = errors.Join(err, setErr)
+			}
+		} else if field.Kind() == reflect.Slice {
+			cp := make(map[string]any)
+			for name, val := range fields_values {
+				if sp := strings.Split(name, "."); len(sp) == 2 {
+					if sp[0] == fname || sp[0] == strctName {
+						cp[sp[1]] = val
+					}
+				}
+			}
+			var newElem reflect.Value
+			if len(cp) > 0 {
+				newElem = reflect.New(field.Type().Elem()).Elem()
+				setErr := SetReflectFieldValue(newElem, cp)
+				err = errors.Join(err, setErr)
+				field.Set(reflect.Append(field, newElem))
 			}
 		}
 	}
