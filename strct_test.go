@@ -35,6 +35,22 @@ func BenchmarkFillFromMap(b *testing.B) {
 		}
 	}
 }
+func BenchmarkFillFromKV(b *testing.B) {
+	t := time.Now()
+	a := Something{}
+	b.ResetTimer()
+	kv := []KV{}
+	kv = append(kv, KV{"id", 1}, KV{"email", "something"}, KV{"is_admin", true}, KV{"created_at", t})
+	for i := 0; i < b.N; i++ {
+		err := FillFromKV(&a, kv)
+		if err != nil {
+			b.Error(err)
+		}
+		if a.Id != 1 || !a.IsAdmin || a.CreatedAt != t {
+			b.Errorf("something wrong %v", a)
+		}
+	}
+}
 
 func BenchmarkFillFromMapS(b *testing.B) {
 	t := time.Now()

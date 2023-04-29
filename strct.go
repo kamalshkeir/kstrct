@@ -256,3 +256,90 @@ func Range[T any](strctPtr *T, fn func(fCtx FieldCtx), tagsToGet ...string) T {
 	}
 	return *strctPtr
 }
+
+type KV struct {
+	Key   string
+	Value any
+}
+
+func FillFromKV[T any](structOrChanPtr *T, fields_values []KV) (err error) {
+	rs := reflect.ValueOf(structOrChanPtr).Elem()
+	if rs.Kind() == reflect.Chan || reflect.ValueOf(structOrChanPtr).Kind() == reflect.Chan {
+		if rs.Kind() == reflect.Pointer {
+			rs = rs.Elem()
+		}
+		chanType := reflect.New(rs.Type().Elem()).Elem()
+		err := SetReflectFieldValue(chanType, fields_values)
+		if err != nil {
+			return err
+		}
+		rs.Send(chanType)
+		return nil
+	}
+	if rs.Kind() == reflect.Ptr {
+		rs = reflect.New(rs.Type().Elem()).Elem()
+	}
+	rt := rs.Type()
+	strctName := rt.Name()
+	indexes, ok := cacheFieldsIndex.Get(strctName)
+	if !ok {
+		indexes = make(map[int]string, rs.NumField())
+		cacheFieldsIndex.Set(strctName, indexes)
+	}
+
+loop:
+	for i := 0; i < rs.NumField(); i++ {
+		field := rs.Field(i)
+		var fname string
+		if vf, ok := indexes[i]; !ok {
+			fname = ToSnakeCase(rt.Field(i).Name)
+			indexes[i] = fname
+		} else {
+			fname = vf
+		}
+		for _, v := range fields_values {
+			if v.Key == fname {
+				setErr := SetReflectFieldValue(field, v.Value)
+				if setErr != nil {
+					err = errors.Join(err, setErr)
+				}
+				continue loop
+			}
+		}
+		if field.Kind() == reflect.Struct || field.Kind() == reflect.Ptr {
+			cp := make(map[string]any)
+			for _, val := range fields_values {
+				if sp := strings.Split(val.Key, "."); len(sp) == 2 {
+					if sp[0] == fname || sp[0] == strctName {
+						cp[sp[1]] = val.Value
+					}
+				}
+			}
+			if len(cp) > 0 {
+				setErr := SetReflectFieldValue(field, cp)
+				err = errors.Join(err, setErr)
+			}
+		} else if field.Kind() == reflect.Slice {
+			cp := make(map[string]any)
+			for _, val := range fields_values {
+				if sp := strings.Split(val.Key, "."); len(sp) == 2 {
+					if sp[0] == fname || sp[0] == strctName {
+						cp[sp[1]] = val.Value
+					}
+				}
+			}
+			var newElem reflect.Value
+			if len(cp) > 0 {
+				newElem = reflect.New(field.Type().Elem()).Elem()
+				setErr := SetReflectFieldValue(newElem, cp)
+				err = errors.Join(err, setErr)
+				field.Set(reflect.Append(field, newElem))
+			}
+		}
+	}
+	if structOrChanPtr != new(T) {
+		return err
+	} else {
+		return fmt.Errorf("pointer is nil")
+	}
+}
