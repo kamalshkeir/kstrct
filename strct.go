@@ -262,9 +262,11 @@ type KV struct {
 	Value any
 }
 
-func FillFromKV[T any](structOrChanPtr *T, fields_values []KV) (err error) {
-	rs := reflect.ValueOf(structOrChanPtr).Elem()
-	if rs.Kind() == reflect.Chan || reflect.ValueOf(structOrChanPtr).Kind() == reflect.Chan {
+func FillFromKV(structOrChanPtr any, fields_values []KV) (err error) {
+	rs := reflect.ValueOf(structOrChanPtr)
+	if rs.Kind() != reflect.Pointer && rs.Kind() == reflect.Struct {
+		return ErrorExpectedPtr
+	} else if rs.Kind() == reflect.Chan || rs.Elem().Kind() == reflect.Chan {
 		if rs.Kind() == reflect.Pointer {
 			rs = rs.Elem()
 		}
@@ -277,7 +279,7 @@ func FillFromKV[T any](structOrChanPtr *T, fields_values []KV) (err error) {
 		return nil
 	}
 	if rs.Kind() == reflect.Ptr {
-		rs = reflect.New(rs.Type().Elem()).Elem()
+		rs = rs.Elem()
 	}
 	rt := rs.Type()
 	strctName := rt.Name()
@@ -337,9 +339,5 @@ loop:
 			}
 		}
 	}
-	if structOrChanPtr != new(T) {
-		return err
-	} else {
-		return fmt.Errorf("pointer is nil")
-	}
+	return err
 }
