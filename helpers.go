@@ -194,6 +194,8 @@ func SetReflectFieldValue(fld reflect.Value, value interface{}, isTime ...bool) 
 			} else {
 				fld.SetBool(false)
 			}
+		case KV:
+			return SetReflectFieldValue(fld, v.Value)
 		default:
 			if vToSet.IsValid() {
 				fld.Set(vToSet)
@@ -210,6 +212,8 @@ func SetReflectFieldValue(fld reflect.Value, value interface{}, isTime ...bool) 
 			fld.SetString(v.String())
 		case float64, float32, int64, int32, uint, int, uint64, uint32:
 			fld.SetString(fmt.Sprintf("%v", v))
+		case KV:
+			return SetReflectFieldValue(fld, v.Value)
 		default:
 			if vToSet.IsValid() {
 				fld.Set(vToSet)
@@ -241,6 +245,8 @@ func SetReflectFieldValue(fld reflect.Value, value interface{}, isTime ...bool) 
 			fld.SetUint(uint64(v))
 		case float32:
 			fld.SetUint(uint64(v))
+		case KV:
+			return SetReflectFieldValue(fld, v.Value)
 		default:
 			if vToSet.IsValid() {
 				fld.Set(vToSet)
@@ -273,6 +279,8 @@ func SetReflectFieldValue(fld reflect.Value, value interface{}, isTime ...bool) 
 			fld.SetUint(uint64(v))
 		case float32:
 			fld.SetUint(uint64(v))
+		case KV:
+			return SetReflectFieldValue(fld, v.Value)
 		default:
 			if vToSet.IsValid() {
 				fld.Set(vToSet)
@@ -315,18 +323,59 @@ func SetReflectFieldValue(fld reflect.Value, value interface{}, isTime ...bool) 
 					return err
 				}
 			}
+		case []KV:
+			for i := 0; i < fld.NumField(); i++ {
+				field := fld.Field(i)
+				tfield := fld.Type().Field(i)
+				fname := tfield.Name
+				found := false
+				var neww any
+				for _, kv := range v {
+					if kv.Key == ToSnakeCase(fname) {
+						found = true
+						neww = kv.Value
+						break
+					}
+				}
+				if found {
+					err := SetReflectFieldValue(field, neww)
+					if err != nil {
+						return err
+					}
+				} else if kstrctTag, ok := tfield.Tag.Lookup("kname"); ok {
+					if kstrctTag == "-" {
+						continue
+					}
+					for _, kv := range v {
+						if kv.Key == kstrctTag {
+							err := SetReflectFieldValue(field, kv.Value)
+							if err != nil {
+								return err
+							}
+							break
+						}
+					}
+				} else {
+					continue
+				}
+			}
+		case KV:
+			return SetReflectFieldValue(fld, v.Value)
 		case time.Time:
 			fld.Set(reflect.ValueOf(v))
 			return nil
 		case int64:
 			t := time.Unix(v, 0)
 			fld.Set(reflect.ValueOf(t))
+			return nil
 		case int:
 			t := time.Unix(int64(v), 0)
 			fld.Set(reflect.ValueOf(t))
+			return nil
 		case uint:
 			t := time.Unix(int64(v), 0)
 			fld.Set(reflect.ValueOf(t))
+			return nil
 		case string:
 			// Use a regular expression to match the desired date format
 			if strings.Contains(v, ":") {
