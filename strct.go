@@ -15,7 +15,7 @@ var (
 	cacheFieldsIndex = kmap.New[string, map[int]string](false)
 )
 
-func FillFromMap(structOrChanPtr any, fields_values map[string]any) (err error) {
+func FillFromMap(structOrChanPtr any, fields_values map[string]any, nested ...bool) (err error) {
 	rs := reflect.ValueOf(structOrChanPtr)
 	if rs.Kind() != reflect.Pointer && rs.Kind() == reflect.Struct {
 		return ErrorExpectedPtr
@@ -82,7 +82,7 @@ func FillFromMap(structOrChanPtr any, fields_values map[string]any) (err error) 
 				setErr := SetReflectFieldValue(field, cp)
 				err = errors.Join(err, setErr)
 			}
-		} else if field.Kind() == reflect.Slice {
+		} else if len(nested) > 0 && nested[0] && field.Kind() == reflect.Slice {
 			cp := make(map[string]any)
 			for name, val := range fields_values {
 				if sp := strings.Split(name, "."); len(sp) == 2 {
@@ -130,7 +130,7 @@ func FillByIndex(structOrChanPtr any, fields_values map[int]any) (err error) {
 	return err
 }
 
-func FillFromMapS[T any](structOrChanPtr *T, fields_values map[string]any) (err error) {
+func FillFromMapS[T any](structOrChanPtr *T, fields_values map[string]any, nested ...bool) (err error) {
 	rs := reflect.ValueOf(structOrChanPtr).Elem()
 	if rs.Kind() == reflect.Chan || reflect.ValueOf(structOrChanPtr).Kind() == reflect.Chan {
 		if rs.Kind() == reflect.Pointer {
@@ -183,7 +183,7 @@ func FillFromMapS[T any](structOrChanPtr *T, fields_values map[string]any) (err 
 				setErr := SetReflectFieldValue(field, cp)
 				err = errors.Join(err, setErr)
 			}
-		} else if field.Kind() == reflect.Slice {
+		} else if len(nested) > 0 && nested[0] && field.Kind() == reflect.Slice {
 			cp := make(map[string]any)
 			for name, val := range fields_values {
 				if sp := strings.Split(name, "."); len(sp) == 2 {
@@ -262,7 +262,7 @@ type KV struct {
 	Value any
 }
 
-func FillFromKV(structOrChanPtr any, fields_values []KV) (err error) {
+func FillFromKV(structOrChanPtr any, fields_values []KV, nested ...bool) (err error) {
 	rs := reflect.ValueOf(structOrChanPtr)
 	if rs.Kind() != reflect.Pointer && rs.Kind() == reflect.Struct {
 		return ErrorExpectedPtr
@@ -321,7 +321,7 @@ loop:
 				setErr := SetReflectFieldValue(field, cp)
 				err = errors.Join(err, setErr)
 			}
-		} else if field.Kind() == reflect.Slice {
+		} else if len(nested) > 0 && nested[0] && field.Kind() == reflect.Slice {
 			cp := make(map[string]any)
 			for _, val := range fields_values {
 				if sp := strings.Split(val.Key, "."); len(sp) == 2 {
