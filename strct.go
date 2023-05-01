@@ -308,7 +308,7 @@ loop:
 				continue loop
 			}
 		}
-		if field.Kind() == reflect.Struct || field.Kind() == reflect.Ptr {
+		if field.Kind() == reflect.Struct || field.Kind() == reflect.Ptr && field.Elem().Kind() == reflect.Struct {
 			cp := make(map[string]any)
 			for _, val := range fields_values {
 				if sp := strings.Split(val.Key, "."); len(sp) == 2 {
@@ -321,7 +321,7 @@ loop:
 				setErr := SetReflectFieldValue(field, cp)
 				err = errors.Join(err, setErr)
 			}
-		} else if len(nested) > 0 && nested[0] && field.Kind() == reflect.Slice {
+		} else if (len(nested) > 0 && nested[0]) && field.Kind() == reflect.Slice || (field.Kind() == reflect.Ptr && field.Elem().Kind() == reflect.Slice) {
 			cp := make(map[string]any)
 			for _, val := range fields_values {
 				if sp := strings.Split(val.Key, "."); len(sp) == 2 {

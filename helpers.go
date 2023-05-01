@@ -312,7 +312,10 @@ func SetReflectFieldValue(fld reflect.Value, value interface{}, isTime ...bool) 
 						}
 					}
 				} else {
-					continue
+					err := FillFromMap(fld.Addr().Interface(), v, true)
+					if err != nil {
+						return err
+					}
 				}
 			}
 		case map[int]any:
@@ -356,7 +359,10 @@ func SetReflectFieldValue(fld reflect.Value, value interface{}, isTime ...bool) 
 						}
 					}
 				} else {
-					continue
+					err := FillFromKV(field.Addr().Interface(), v, true)
+					if err != nil {
+						return err
+					}
 				}
 			}
 		case KV:
@@ -458,7 +464,7 @@ func SetReflectFieldValue(fld reflect.Value, value interface{}, isTime ...bool) 
 	case reflect.Slice:
 		targetType := fld.Type()
 		typeName := targetType.String()
-		if strings.HasPrefix(typeName, "[]") {
+		if strings.HasPrefix(typeName, "[") || strings.HasPrefix(typeName, "*[") {
 			array := reflect.New(targetType).Elem()
 			for _, v := range strings.Split(fmt.Sprintf("%v", value), ",") {
 				switch typeName[2:] {
@@ -477,16 +483,13 @@ func SetReflectFieldValue(fld reflect.Value, value interface{}, isTime ...bool) 
 						array = reflect.Append(array, reflect.ValueOf(vv))
 					}
 				default:
-					if vToSet.Kind() == reflect.Map {
-						// Convert the value slice to a slice of the correct element type
-						strctElement := reflect.New(fld.Type().Elem()).Elem()
-						err := SetReflectFieldValue(strctElement, vToSet.Interface())
-						if err != nil {
-							fmt.Println("err set nested:", err)
-							return err
-						}
-						array = reflect.Append(fld, strctElement)
+					strctElement := reflect.New(fld.Type().Elem()).Elem()
+					err := SetReflectFieldValue(strctElement, vToSet.Interface())
+					if err != nil {
+						fmt.Println("err set nested:", err)
+						return err
 					}
+					array = reflect.Append(fld, strctElement)
 				}
 			}
 			fld.Set(array)
