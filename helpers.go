@@ -346,43 +346,9 @@ func SetReflectFieldValue(fld reflect.Value, value interface{}, isTime ...bool) 
 				}
 			}
 		case []KV:
-			for i := 0; i < fld.NumField(); i++ {
-				field := fld.Field(i)
-				tfield := fld.Type().Field(i)
-				fname := tfield.Name
-				found := false
-				var neww any
-				for _, kv := range v {
-					if kv.Key == ToSnakeCase(fname) {
-						found = true
-						neww = kv.Value
-						break
-					}
-				}
-				if found {
-					err := SetReflectFieldValue(field, neww)
-					if err != nil {
-						return err
-					}
-				} else if kstrctTag, ok := tfield.Tag.Lookup("kname"); ok {
-					if kstrctTag == "-" {
-						continue
-					}
-					for _, kv := range v {
-						if kv.Key == kstrctTag {
-							err := SetReflectFieldValue(field, kv.Value)
-							if err != nil {
-								return err
-							}
-							break
-						}
-					}
-				} else {
-					err := FillFromKV(field.Addr().Interface(), v, true)
-					if err != nil {
-						return err
-					}
-				}
+			err := FillFromKV(fld.Addr().Interface(), v, true)
+			if err != nil {
+				return err
 			}
 		case KV:
 			return SetReflectFieldValue(fld, v.Value)
