@@ -165,8 +165,23 @@ func SetReflectFieldValue(fld reflect.Value, value interface{}, isTime ...bool) 
 		fld.Set(vToSet)
 		return nil
 	}
+
 	var errReturn error
 	switch fld.Kind() {
+	case reflect.Ptr:
+		unwrapped := fld.Elem()
+		if !unwrapped.IsValid() {
+			newUnwrapped := reflect.New(fld.Type().Elem())
+			if err := SetReflectFieldValue(newUnwrapped, value); err != nil {
+				return err
+			}
+			fld.Set(newUnwrapped)
+		} else {
+			if err := SetReflectFieldValue(unwrapped, value); err != nil {
+				return err
+			}
+		}
+		return errReturn
 	case reflect.Bool:
 		switch v := value.(type) {
 		case bool:
@@ -312,7 +327,11 @@ func SetReflectFieldValue(fld reflect.Value, value interface{}, isTime ...bool) 
 						}
 					}
 				} else {
-					err := FillFromMap(fld.Addr().Interface(), v, true)
+					sl := []KV{}
+					for k, vv := range v {
+						sl = append(sl, KV{Key: k, Value: vv})
+					}
+					err := FillFromKV(fld.Addr().Interface(), sl, true)
 					if err != nil {
 						return err
 					}
@@ -493,20 +512,6 @@ func SetReflectFieldValue(fld reflect.Value, value interface{}, isTime ...bool) 
 				}
 			}
 			fld.Set(array)
-		}
-		return errReturn
-	case reflect.Ptr:
-		unwrapped := fld.Elem()
-		if !unwrapped.IsValid() {
-			newUnwrapped := reflect.New(fld.Type().Elem())
-			if err := SetReflectFieldValue(newUnwrapped, value); err != nil {
-				return err
-			}
-			fld.Set(newUnwrapped)
-		} else {
-			if err := SetReflectFieldValue(unwrapped, value); err != nil {
-				return err
-			}
 		}
 		return errReturn
 	}

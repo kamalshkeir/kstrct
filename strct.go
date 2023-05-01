@@ -299,6 +299,7 @@ loop:
 		} else {
 			fname = vf
 		}
+
 		for _, v := range fields_values {
 			if v.Key == fname {
 				setErr := SetReflectFieldValue(field, v.Value)
@@ -308,7 +309,14 @@ loop:
 				continue loop
 			}
 		}
-		if field.Kind() == reflect.Struct || field.Kind() == reflect.Ptr && field.Elem().Kind() == reflect.Struct {
+
+		if field.Kind() == reflect.Ptr {
+			if !field.Elem().IsValid() {
+				fieldNew := reflect.New(field.Type().Elem())
+				field.Set(fieldNew)
+			}
+		}
+		if field.Kind() == reflect.Struct || (field.Kind() == reflect.Ptr && field.Elem().Kind() == reflect.Struct) {
 			cp := make(map[string]any)
 			for _, val := range fields_values {
 				if sp := strings.Split(val.Key, "."); len(sp) == 2 {
@@ -318,10 +326,22 @@ loop:
 				}
 			}
 			if len(cp) > 0 {
-				setErr := SetReflectFieldValue(field, cp)
-				err = errors.Join(err, setErr)
+				if field.Kind() == reflect.Ptr {
+					field = field.Elem()
+					setErr := SetReflectFieldValue(field, cp)
+					err = errors.Join(err, setErr)
+				} else {
+					setErr := SetReflectFieldValue(field, cp)
+					err = errors.Join(err, setErr)
+				}
 			}
-		} else if (len(nested) > 0 && nested[0]) && field.Kind() == reflect.Slice || (field.Kind() == reflect.Ptr && field.Elem().Kind() == reflect.Slice) {
+		} else if (len(nested) > 0 && nested[0]) && (field.Kind() == reflect.Slice || field.Kind() == reflect.Ptr) {
+			if field.Kind() == reflect.Ptr {
+				field = field.Elem()
+				if !field.IsValid() {
+					return fmt.Errorf("field nested slice not valid %v", field.Kind())
+				}
+			}
 			cp := make(map[string]any)
 			for _, val := range fields_values {
 				if sp := strings.Split(val.Key, "."); len(sp) == 2 {
