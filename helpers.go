@@ -44,7 +44,7 @@ type Info struct {
 	Tags   map[string][]string
 }
 
-func GetInfos[T comparable](strct *T, tagsToCheck ...string) *Info {
+func GetInfos[T any](strct *T, tagsToCheck ...string) *Info {
 	// Use the sync.Pool to get a slice and maps to use for the fields, values, and tags maps.
 	fields := fieldsPool.Get().(*[]string)
 	values := fValuesPool.Get().(map[string]interface{})
