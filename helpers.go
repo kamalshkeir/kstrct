@@ -49,15 +49,19 @@ func GetInfos[T any](strct *T, tagsToCheck ...string) *Info {
 	fields := fieldsPool.Get().(*[]string)
 	values := fValuesPool.Get().(map[string]interface{})
 	tags := fTagsPool.Get().(map[string][]string)
-
-	// Clear the slice and maps to reuse them.
-	*fields = (*fields)[:0]
-	for k := range values {
-		delete(values, k)
-	}
-	for k := range tags {
-		delete(tags, k)
-	}
+	// Return the fields slice and maps to the sync.Pool for reuse.
+	defer func() {
+		*fields = (*fields)[:0]
+		fieldsPool.Put(fields)
+		for k := range values {
+			delete(values, k)
+		}
+		fValuesPool.Put(values)
+		for k := range tags {
+			delete(tags, k)
+		}
+		fTagsPool.Put(tags)
+	}()
 
 	s := reflect.ValueOf(strct).Elem()
 	typeOfT := s.Type()
@@ -136,20 +140,6 @@ func GetInfos[T any](strct *T, tagsToCheck ...string) *Info {
 		Types:  types,
 		Tags:   tags,
 	}
-
-	// Return the fields slice and maps to the sync.Pool for reuse.
-	defer func() {
-		fields = &[]string{}
-		fieldsPool.Put(fields)
-		for k := range values {
-			delete(values, k)
-		}
-		fValuesPool.Put(values)
-		for k := range tags {
-			delete(tags, k)
-		}
-		fTagsPool.Put(tags)
-	}()
 
 	return info
 }
