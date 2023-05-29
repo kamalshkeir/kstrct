@@ -138,9 +138,18 @@ func GetInfos[T any](strct *T, tagsToCheck ...string) *Info {
 	}
 
 	// Return the fields slice and maps to the sync.Pool for reuse.
-	fieldsPool.Put(fields)
-	fValuesPool.Put(values)
-	fTagsPool.Put(tags)
+	defer func() {
+		fields = &[]string{}
+		fieldsPool.Put(fields)
+		for k := range values {
+			delete(values, k)
+		}
+		fValuesPool.Put(values)
+		for k := range tags {
+			delete(tags, k)
+		}
+		fTagsPool.Put(tags)
+	}()
 
 	return info
 }
