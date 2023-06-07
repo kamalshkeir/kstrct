@@ -6,145 +6,12 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 )
 
 var Debug = false
 
-// fieldsPool is a sync.Pool that can be used to avoid allocating
-// new slices on each call to the GetInfos function.
-var fieldsPool = sync.Pool{
-	New: func() interface{} {
-		s := make([]string, 0, 32)
-		return &s
-	},
-}
-
-// fValuesPool is a sync.Pool that can be used to avoid allocating
-// new maps on each call to the GetInfos function.
-var fValuesPool = sync.Pool{
-	New: func() interface{} {
-		return make(map[string]interface{})
-	},
-}
-
-// fTagsPool is a sync.Pool that can be used to avoid allocating
-// new maps on each call to the GetInfos function.
-var fTagsPool = sync.Pool{
-	New: func() interface{} {
-		return make(map[string][]string)
-	},
-}
-
-type Info struct {
-	Fields []string
-	Values map[string]interface{}
-	Types  map[string]string
-	Tags   map[string][]string
-}
-
-func GetInfos[T any](strct *T, tagsToCheck ...string) *Info {
-	// Use the sync.Pool to get a slice and maps to use for the fields, values, and tags maps.
-	fields := fieldsPool.Get().(*[]string)
-	values := fValuesPool.Get().(map[string]interface{})
-	tags := fTagsPool.Get().(map[string][]string)
-	// Return the fields slice and maps to the sync.Pool for reuse.
-	defer func() {
-		*fields = (*fields)[:0]
-		fieldsPool.Put(fields)
-		for k := range values {
-			delete(values, k)
-		}
-		fValuesPool.Put(values)
-		for k := range tags {
-			delete(tags, k)
-		}
-		fTagsPool.Put(tags)
-	}()
-
-	s := reflect.ValueOf(strct).Elem()
-	typeOfT := s.Type()
-	numFields := s.NumField()
-
-	// Pre-allocate the fields slice to avoid reallocations on each iteration.
-	if cap((*fields)) < numFields {
-		nn := []string{}
-		fields = &nn
-		// Create a new map to store the field types.
-		types := make(map[string]string)
-
-		for i := 0; i < numFields; i++ {
-			f := s.Field(i)
-			fname := typeOfT.Field(i).Name
-			fname = ToSnakeCase(fname)
-			fvalue := f.Interface()
-			ftype := f.Type()
-
-			*fields = append(*fields, fname)
-			values[fname] = fvalue
-			if ftype.Kind() == reflect.Ptr {
-				types[fname] = ftype.Elem().String()
-			} else {
-				types[fname] = ftype.String()
-			}
-			for _, t := range tagsToCheck {
-				if ftag, ok := typeOfT.Field(i).Tag.Lookup(t); ok {
-					tagList := strings.Split(ftag, ";")
-					tags[fname] = append(tags[fname], tagList...)
-				}
-			}
-		}
-
-		// Create a new Info struct and return it.
-		info := &Info{
-			Fields: *fields,
-			Values: values,
-			Types:  types,
-			Tags:   tags,
-		}
-
-		// Return the fields slice and maps to the sync.Pool for reuse.
-		fieldsPool.Put(fields)
-		fValuesPool.Put(values)
-		fTagsPool.Put(tags)
-
-		return info
-	}
-	// If the capacity of the fields slice is not less than the number of fields,
-	// we can use the existing slice and maps.
-	types := make(map[string]string)
-
-	for i := 0; i < numFields; i++ {
-		f := s.Field(i)
-		fname := typeOfT.Field(i).Name
-		fname = ToSnakeCase(fname)
-		fvalue := f.Interface()
-		ftype := f.Type().Name()
-
-		*fields = append(*fields, fname)
-		values[fname] = fvalue
-		types[fname] = ftype
-		for _, t := range tagsToCheck {
-			if ftag, ok := typeOfT.Field(i).Tag.Lookup(t); ok {
-				tagList := strings.Split(ftag, ";")
-				tags[fname] = append(tags[fname], tagList...)
-			}
-		}
-	}
-
-	// Create a new Info struct and return it.
-	info := &Info{
-		Fields: *fields,
-		Values: values,
-		Types:  types,
-		Tags:   tags,
-	}
-
-	return info
-}
-
-func SetReflectFieldValue(fld reflect.Value, value interface{}, isTime ...bool) error {
+func SetReflectFieldValue(fld reflect.Value, value any, isTime ...bool) error {
 	var errPanic error
 	defer func() {
 		if r := recover(); r != nil {
@@ -167,7 +34,7 @@ func SetReflectFieldValue(fld reflect.Value, value interface{}, isTime ...bool) 
 
 	var errReturn error
 	switch fld.Kind() {
-	case reflect.Ptr:
+	case reflect.Pointer:
 		unwrapped := fld.Elem()
 		if !unwrapped.IsValid() {
 			newUnwrapped := reflect.New(fld.Type().Elem())
@@ -397,7 +264,7 @@ func SetReflectFieldValue(fld reflect.Value, value interface{}, isTime ...bool) 
 			}
 			return errReturn
 
-		case []interface{}:
+		case []any:
 			// Walk the fields
 			for i := 0; i < fld.NumField(); i++ {
 				if err := SetReflectFieldValue(fld.Field(i), v[i]); err != nil {
