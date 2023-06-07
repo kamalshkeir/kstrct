@@ -31,11 +31,13 @@ func SetReflectFieldValue(fld reflect.Value, value any, isTime ...bool) error {
 		fld.Set(vToSet)
 		return nil
 	}
-
 	var errReturn error
 	switch fld.Kind() {
 	case reflect.Pointer:
 		unwrapped := fld.Elem()
+		if unwrapped.Kind() == reflect.Slice {
+			return fmt.Errorf("field of type pointer to slice not handled")
+		}
 		if !unwrapped.IsValid() {
 			newUnwrapped := reflect.New(fld.Type().Elem())
 			if err := SetReflectFieldValue(newUnwrapped, value); err != nil {
@@ -315,9 +317,10 @@ func SetReflectFieldValue(fld reflect.Value, value any, isTime ...bool) error {
 	case reflect.Slice:
 		targetType := fld.Type()
 		typeName := targetType.String()
-		if strings.HasPrefix(typeName, "[") || strings.HasPrefix(typeName, "*[") {
+		if typeName[0] == '[' {
 			array := reflect.New(targetType).Elem()
 			for _, v := range strings.Split(fmt.Sprintf("%v", value), ",") {
+				v = strings.TrimSpace(v)
 				switch typeName[2:] {
 				case "string":
 					array = reflect.Append(array, reflect.ValueOf(v))
@@ -325,22 +328,30 @@ func SetReflectFieldValue(fld reflect.Value, value any, isTime ...bool) error {
 					if vv, err := strconv.Atoi(v); err == nil {
 						array = reflect.Append(array, reflect.ValueOf(vv))
 					}
+				case "int64":
+					if vv, err := strconv.Atoi(v); err == nil {
+						array = reflect.Append(array, reflect.ValueOf(int64(vv)))
+					}
 				case "uint":
 					if vv, err := strconv.ParseUint(v, 10, 64); err == nil {
 						array = reflect.Append(array, reflect.ValueOf(uint(vv)))
+					}
+				case "uint8":
+					if vv, err := strconv.ParseUint(v, 10, 8); err == nil {
+						array = reflect.Append(array, reflect.ValueOf(uint8(vv)))
 					}
 				case "float64":
 					if vv, err := strconv.ParseFloat(v, 64); err == nil {
 						array = reflect.Append(array, reflect.ValueOf(vv))
 					}
 				default:
-					strctElement := reflect.New(fld.Type().Elem()).Elem()
+					strctElement := reflect.New(fld.Type().Elem()).Elem() // Create a new instance of strctElement for each iteration
 					err := SetReflectFieldValue(strctElement, vToSet.Interface())
 					if err != nil {
 						fmt.Println("err set nested:", err)
 						return err
 					}
-					array = reflect.Append(fld, strctElement)
+					array = reflect.Append(array, strctElement) // Append strctElement to the array
 				}
 			}
 			fld.Set(array)
