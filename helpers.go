@@ -11,6 +11,55 @@ import (
 
 var Debug = false
 
+type Istring interface {
+	String() string
+}
+type Ibyte interface {
+	Byte() []byte
+}
+type Iuint interface {
+	Uint() uint
+}
+type Iuint64 interface {
+	Uint64() uint64
+}
+type Iuint32 interface {
+	Uint32() uint32
+}
+type Iuint16 interface {
+	Uint16() uint16
+}
+type Iuint8 interface {
+	Uint8() uint8
+}
+type Ifloat64 interface {
+	Float64() float64
+}
+type Ifloat32 interface {
+	Float32() float32
+}
+type Ibool interface {
+	Bool() bool
+}
+type Iint interface {
+	Int() int
+}
+type Iint64 interface {
+	Int64() int64
+}
+type Iint32 interface {
+	Int32() int32
+}
+type Iint16 interface {
+	Int16() int16
+}
+type Iint8 interface {
+	Int8() int8
+}
+type Itime interface {
+	Time() time.Time
+}
+
 func SetReflectFieldValue(fld reflect.Value, value any, isTime ...bool) error {
 	var errPanic error
 	defer func() {
@@ -52,6 +101,16 @@ func SetReflectFieldValue(fld reflect.Value, value any, isTime ...bool) error {
 		return errReturn
 	case reflect.Bool:
 		switch v := value.(type) {
+		case Ibool:
+			fld.SetBool(v.Bool())
+		case Istring:
+			if v.String() == "1" || v.String() == "true" {
+				fld.SetBool(true)
+			} else if v.String() == "0" || v.String() == "false" {
+				fld.SetBool(false)
+			} else {
+				errReturn = fmt.Errorf("invalid bool string value: %v", v)
+			}
 		case bool:
 			fld.SetBool(v)
 		case string:
@@ -89,10 +148,16 @@ func SetReflectFieldValue(fld reflect.Value, value any, isTime ...bool) error {
 		return errReturn
 	case reflect.String:
 		switch v := value.(type) {
+		case Istring:
+			fld.SetString(v.String())
+		case Ibyte:
+			fld.SetString(string(v.Byte()))
+		case Itime:
+			fld.SetString(v.Time().String())
 		case string:
 			fld.SetString(v)
-		case time.Time:
-			fld.SetString(v.String())
+		case []byte:
+			fld.SetString(string(v))
 		case float64, float32, int64, int32, uint, int, uint64, uint32:
 			fld.SetString(fmt.Sprintf("%v", v))
 		case KV:
@@ -108,26 +173,55 @@ func SetReflectFieldValue(fld reflect.Value, value any, isTime ...bool) error {
 		return errReturn
 	case reflect.Uint, reflect.Uint64, reflect.Uint32, reflect.Uint16, reflect.Uint8:
 		switch v := value.(type) {
+		case Iuint:
+			fld.SetUint(uint64(v.Uint()))
 		case uint:
 			fld.SetUint(uint64(v))
+		case Iuint64:
+			fld.SetUint(v.Uint64())
 		case uint64:
 			fld.SetUint(v)
+		case Iint:
+			fld.SetUint(uint64(v.Int()))
 		case int:
 			fld.SetUint(uint64(v))
+		case Iint64:
+			fld.SetUint(uint64(v.Int64()))
 		case int64:
 			fld.SetUint(uint64(v))
+		case Iuint32:
+			fld.SetUint(uint64(v.Uint32()))
 		case uint32:
 			fld.SetUint(uint64(v))
+		case Iint32:
+			fld.SetUint(uint64(v.Int32()))
 		case int32:
 			fld.SetUint(uint64(v))
+		case Istring:
+			if v, err := strconv.Atoi(v.String()); err == nil {
+				fld.SetUint(uint64(v))
+			}
 		case string:
 			if v, err := strconv.Atoi(v); err == nil {
 				fld.SetUint(uint64(v))
 			}
+		case Ibyte:
+			if v, err := strconv.Atoi(string(v.Byte())); err == nil {
+				fld.SetUint(uint64(v))
+			}
+		case []byte:
+			if v, err := strconv.Atoi(string(v)); err == nil {
+				fld.SetUint(uint64(v))
+			}
+		case Ifloat64:
+			fld.SetUint(uint64(v.Float64()))
+		case Ifloat32:
+			fld.SetUint(uint64(v.Float32()))
 		case float64:
 			fld.SetUint(uint64(v))
 		case float32:
 			fld.SetUint(uint64(v))
+
 		case KV:
 			return SetReflectFieldValue(fld, v.Value)
 		default:
@@ -140,26 +234,56 @@ func SetReflectFieldValue(fld reflect.Value, value any, isTime ...bool) error {
 		return errReturn
 	case reflect.Int, reflect.Int64, reflect.Int32, reflect.Int16, reflect.Int8:
 		switch v := value.(type) {
+		case Iint:
+			fld.SetInt(int64(v.Int()))
 		case int:
 			fld.SetInt(int64(v))
+		case Iint64:
+			fld.SetInt(v.Int64())
 		case int64:
 			fld.SetInt(v)
+		case Iuint:
+			fld.SetInt(int64(v.Uint()))
 		case uint:
 			fld.SetInt(int64(v))
+		case Iuint64:
+			fld.SetInt(int64(v.Uint64()))
 		case uint64:
 			fld.SetInt(int64(v))
+		case Iint32:
+			fld.SetInt(int64(v.Int32()))
 		case int32:
 			fld.SetInt(int64(v))
+		case Iint16:
+			fld.SetInt(int64(v.Int16()))
 		case int16:
 			fld.SetInt(int64(v))
+		case Iint8:
+			fld.SetInt(int64(v.Int8()))
 		case int8:
 			fld.SetInt(int64(v))
+		case Istring:
+			if v, err := strconv.Atoi(v.String()); err == nil {
+				fld.SetInt(int64(v))
+			}
 		case string:
 			if v, err := strconv.Atoi(v); err == nil {
 				fld.SetInt(int64(v))
 			}
+		case Ibyte:
+			if v, err := strconv.Atoi(string(v.Byte())); err == nil {
+				fld.SetInt(int64(v))
+			}
+		case []byte:
+			if v, err := strconv.Atoi(string(v)); err == nil {
+				fld.SetInt(int64(v))
+			}
+		case Ifloat64:
+			fld.SetUint(uint64(v.Float64()))
 		case float64:
 			fld.SetUint(uint64(v))
+		case Ifloat32:
+			fld.SetUint(uint64(v.Float32()))
 		case float32:
 			fld.SetUint(uint64(v))
 		case KV:
@@ -220,6 +344,9 @@ func SetReflectFieldValue(fld reflect.Value, value any, isTime ...bool) error {
 			}
 		case KV:
 			return SetReflectFieldValue(fld, v.Value)
+		case Itime:
+			fld.Set(reflect.ValueOf(v.Time()))
+			return nil
 		case time.Time:
 			fld.Set(reflect.ValueOf(v))
 			return nil
@@ -289,21 +416,36 @@ func SetReflectFieldValue(fld reflect.Value, value any, isTime ...bool) error {
 		}
 		return errReturn
 	case reflect.Float64, reflect.Float32:
-		if v, ok := value.(float64); ok {
+		switch v := value.(type) {
+		case Ifloat64:
+			fld.SetFloat(v.Float64())
+		case float64:
 			fld.SetFloat(v)
-		} else if v, ok := value.(float32); ok {
+		case Ifloat32:
+			fld.SetFloat(float64(v.Float32()))
+		case float32:
 			fld.SetFloat(float64(v))
-		} else if v, ok := value.(string); ok {
+		case Istring:
+			f64, err := strconv.ParseFloat(v.String(), 64)
+			if err == nil {
+				fld.SetFloat(f64)
+			}
+		case string:
 			f64, err := strconv.ParseFloat(v, 64)
 			if err == nil {
 				fld.SetFloat(f64)
 			}
-		} else if v, ok := value.([]byte); ok {
+		case Ibyte:
+			f64, err := strconv.ParseFloat(string(v.Byte()), 64)
+			if err == nil {
+				fld.SetFloat(f64)
+			}
+		case []byte:
 			f64, err := strconv.ParseFloat(string(v), 64)
 			if err == nil {
 				fld.SetFloat(f64)
 			}
-		} else {
+		default:
 			if vToSet.IsValid() {
 				fld.Set(vToSet)
 			} else {
