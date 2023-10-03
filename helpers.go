@@ -1,6 +1,7 @@
 package kstrct
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	"reflect"
@@ -121,7 +122,7 @@ func SetReflectFieldValue(fld reflect.Value, value any, isTime ...bool) error {
 			} else {
 				errReturn = fmt.Errorf("invalid bool string value: %v", v)
 			}
-		case int, int64, int32, uint, uint64, float32, float64, uint32:
+		case int, int64, int32, uint, uint64, float32, float64, uint32, Iint, Iint16, Iint32, Iint64, Iint8, Iuint, Iuint64, Iuint32, Iuint16, Iuint8, Ifloat64, Ifloat32:
 			// Convert numeric values to boolean values
 			if Debug {
 				fmt.Printf("value: %v, typeValue: %T %v \n", v, v, v == 0)
@@ -158,7 +159,7 @@ func SetReflectFieldValue(fld reflect.Value, value any, isTime ...bool) error {
 			fld.SetString(v)
 		case []byte:
 			fld.SetString(string(v))
-		case float64, float32, int64, int32, uint, int, uint64, uint32:
+		case float64, float32, int64, int32, uint, int, uint64, uint32, Iint, Iint16, Iint32, Iint64, Iint8, Iuint, Iuint64, Iuint32, Iuint16, Iuint8, Ifloat64, Ifloat32:
 			fld.SetString(fmt.Sprintf("%v", v))
 		case KV:
 			return SetReflectFieldValue(fld, v.Value)
@@ -221,7 +222,6 @@ func SetReflectFieldValue(fld reflect.Value, value any, isTime ...bool) error {
 			fld.SetUint(uint64(v))
 		case float32:
 			fld.SetUint(uint64(v))
-
 		case KV:
 			return SetReflectFieldValue(fld, v.Value)
 		default:
@@ -296,7 +296,22 @@ func SetReflectFieldValue(fld reflect.Value, value any, isTime ...bool) error {
 			}
 		}
 		return errReturn
+
 	case reflect.Struct:
+		if v, ok := fld.Addr().Interface().(sql.Scanner); ok {
+			// nulltype
+			if !vToSet.IsZero() {
+				err := v.Scan(value)
+				if err != nil && strings.Contains(err.Error(), "time.Time") {
+					if vv, ok := value.(int64); ok {
+						t := time.Unix(vv, 0)
+						return v.Scan(t)
+					}
+				}
+				return err
+			}
+			return nil
+		}
 		switch v := value.(type) {
 		case map[string]any:
 			for i := 0; i < fld.NumField(); i++ {
@@ -402,6 +417,7 @@ func SetReflectFieldValue(fld reflect.Value, value any, isTime ...bool) error {
 			}
 			return errReturn
 		default:
+
 			if vToSet.Type().AssignableTo(fld.Type()) {
 				fld.Set(vToSet)
 			} else if vToSet.Kind() == reflect.Slice {
