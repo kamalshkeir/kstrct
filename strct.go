@@ -376,6 +376,8 @@ loop:
 			if len(cp) > 0 {
 				setErr := SetReflectFieldValue(newElem, cp)
 				err = errors.Join(err, setErr)
+				field.Set(reflect.Append(field, newElem))
+				continue loop
 			}
 			isStrct := false
 			if len(nnested) > 0 {
