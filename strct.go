@@ -12,7 +12,7 @@ import (
 
 var (
 	ErrorExpectedPtr = errors.New("expected structToFill to be a pointer")
-	cacheFieldsIndex = kmap.New[string, map[int]string](false)
+	cacheFieldsIndex = kmap.New[string, map[int]string]()
 )
 
 func FillFromMap(structOrChanPtr any, fields_values map[string]any, nested ...bool) (err error) {

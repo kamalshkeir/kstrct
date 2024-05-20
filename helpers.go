@@ -519,8 +519,5 @@ func SetReflectFieldValue(fld reflect.Value, value any, isTime ...bool) error {
 	if errPanic != nil {
 		return errPanic
 	}
-	if errReturn != nil {
-		return errReturn
-	}
 	return nil
 }
