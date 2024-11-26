@@ -1,5 +1,5 @@
 module github.com/kamalshkeir/kstrct
 
-go 1.21
+go 1.23
 
 require github.com/kamalshkeir/kmap v1.1.4

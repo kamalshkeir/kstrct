@@ -7,13 +7,20 @@ import (
 	"strings"
 	"sync"
 
+	"iter"
+
 	"github.com/kamalshkeir/kmap"
 )
 
 var (
 	ErrorExpectedPtr = errors.New("expected structToFill to be a pointer")
-	cacheFieldsIndex = kmap.New[string, map[int]string]()
 )
+
+type fieldCache struct {
+	names []string
+}
+
+var cacheFieldsIndex = kmap.New[string, *fieldCache]()
 
 func FillFromMap(structOrChanPtr any, fields_values map[string]any, nested ...bool) (err error) {
 	rs := reflect.ValueOf(structOrChanPtr)
@@ -43,10 +50,8 @@ func FillFromMap(structOrChanPtr any, fields_values map[string]any, nested ...bo
 	strctName := rt.Name()
 	indexes, ok := cacheFieldsIndex.Get(strctName)
 	if !ok {
-		if rs.Kind() == reflect.Pointer {
-			indexes = make(map[int]string)
-		} else {
-			indexes = make(map[int]string)
+		indexes = &fieldCache{
+			names: make([]string, rs.NumField()),
 		}
 		cacheFieldsIndex.Set(strctName, indexes)
 	}
@@ -55,11 +60,11 @@ func FillFromMap(structOrChanPtr any, fields_values map[string]any, nested ...bo
 	for i := 0; i < rs.NumField(); i++ {
 		field := rs.Field(i)
 		var fname string
-		if vf, ok := indexes[i]; !ok {
+		if indexes.names[i] == "" {
 			fname = ToSnakeCase(rt.Field(i).Name)
-			indexes[i] = fname
+			indexes.names[i] = fname
 		} else {
-			fname = vf
+			fname = indexes.names[i]
 		}
 
 		if v, ok := fields_values[fname]; ok {
@@ -198,6 +203,16 @@ type FieldCtx struct {
 	Tags      []string
 }
 
+func (ctx *FieldCtx) Reset() {
+	ctx.NumFields = 0
+	ctx.Index = 0
+	ctx.Field = reflect.Value{}
+	ctx.Name = ""
+	ctx.Value = nil
+	ctx.Type = ""
+	ctx.Tags = ctx.Tags[:0]
+}
+
 var fieldCtxPool = sync.Pool{
 	New: func() any {
 		return &FieldCtx{
@@ -206,35 +221,59 @@ var fieldCtxPool = sync.Pool{
 	},
 }
 
-func Range[T any](strctPtr *T, fn func(fCtx FieldCtx), tagsToGet ...string) T {
-	rs := reflect.ValueOf(strctPtr).Elem()
-	typeOfT := rs.Type()
-	numFields := rs.NumField()
-	for i := 0; i < numFields; i++ {
-		f := rs.Field(i)
-		fname := ToSnakeCase(typeOfT.Field(i).Name)
+// From returns an iterator for struct fields
+func From(strctPtr any, tagsToGet ...string) iter.Seq2[int, FieldCtx] {
+	return func(yield func(int, FieldCtx) bool) {
+		rs := reflect.ValueOf(strctPtr).Elem()
+		rt := rs.Type()
+		numFields := rs.NumField()
+		strctName := rt.Name()
 
-		// Get a fieldCtx from the pool
-		ctx := fieldCtxPool.Get().(*FieldCtx)
-		val := f.Interface()
-		ctx.Field = f
-		ctx.Name = fname
-		ctx.Value = val
-		ctx.Type = reflect.TypeOf(val).Name()
-		ctx.NumFields = numFields
-		ctx.Index = i
-		ctx.Tags = ctx.Tags[:0]
-		for _, t := range tagsToGet {
-			if ftag, ok := typeOfT.Field(i).Tag.Lookup(t); ok {
-				ctx.Tags = append(ctx.Tags, ftag)
+		// Get or create field index cache
+		cache, ok := cacheFieldsIndex.Get(strctName)
+		if !ok {
+			cache = &fieldCache{
+				names: make([]string, numFields),
 			}
+			cacheFieldsIndex.Set(strctName, cache)
 		}
-		fn(*ctx)
 
-		// Put the fieldCtx back into the pool
-		fieldCtxPool.Put(ctx)
+		for i := 0; i < numFields; i++ {
+			f := rs.Field(i)
+			var fname string
+			if cache.names[i] == "" {
+				fname = ToSnakeCase(rt.Field(i).Name)
+				cache.names[i] = fname
+			} else {
+				fname = cache.names[i]
+			}
+
+			// Get a fieldCtx from the pool
+			ctx := fieldCtxPool.Get().(*FieldCtx)
+			val := f.Interface()
+			ctx.Field = f
+			ctx.Name = fname
+			ctx.Value = val
+			ctx.Type = reflect.TypeOf(val).Name()
+			ctx.NumFields = numFields
+			ctx.Index = i
+			ctx.Tags = ctx.Tags[:0]
+
+			for _, t := range tagsToGet {
+				if ftag, ok := rt.Field(i).Tag.Lookup(t); ok {
+					ctx.Tags = append(ctx.Tags, ftag)
+				}
+			}
+
+			if !yield(i, *ctx) {
+				ctx.Reset()
+				fieldCtxPool.Put(ctx)
+				return
+			}
+			ctx.Reset()
+			fieldCtxPool.Put(ctx)
+		}
 	}
-	return *strctPtr
 }
 
 type KV struct {
@@ -263,22 +302,28 @@ func FillFromKV(structOrChanPtr any, fields_values []KV, nested ...bool) (err er
 	}
 	rt := rs.Type()
 	strctName := rt.Name()
-	indexes, ok := cacheFieldsIndex.Get(strctName)
+	numFields := rs.NumField()
+
+	// Get or create field index cache
+	cache, ok := cacheFieldsIndex.Get(strctName)
 	if !ok {
-		indexes = make(map[int]string, rs.NumField())
-		cacheFieldsIndex.Set(strctName, indexes)
+		cache = &fieldCache{
+			names: make([]string, numFields),
+		}
+		cacheFieldsIndex.Set(strctName, cache)
 	}
+
 	nnested := []string{}
 	nn := make(map[string]any)
 loop:
-	for i := 0; i < rs.NumField(); i++ {
+	for i := 0; i < numFields; i++ {
 		field := rs.Field(i)
 		var fname string
-		if vf, ok := indexes[i]; !ok {
+		if cache.names[i] == "" {
 			fname = ToSnakeCase(rt.Field(i).Name)
-			indexes[i] = fname
+			cache.names[i] = fname
 		} else {
-			fname = vf
+			fname = cache.names[i]
 		}
 
 		for _, v := range fields_values {
@@ -407,4 +452,56 @@ loop:
 		}
 	}
 	return err
+}
+
+func Range[T any](strctPtr *T, fn func(c FieldCtx) bool, tagsToGet ...string) T {
+	rs := reflect.ValueOf(strctPtr).Elem()
+	rt := rs.Type()
+	numFields := rs.NumField()
+	strctName := rt.Name()
+
+	// Get or create field index cache
+	cache, ok := cacheFieldsIndex.Get(strctName)
+	if !ok {
+		cache = &fieldCache{
+			names: make([]string, numFields),
+		}
+		cacheFieldsIndex.Set(strctName, cache)
+	}
+
+	for i := 0; i < numFields; i++ {
+		f := rs.Field(i)
+		var fname string
+		if cache.names[i] == "" {
+			fname = ToSnakeCase(rt.Field(i).Name)
+			cache.names[i] = fname
+		} else {
+			fname = cache.names[i]
+		}
+
+		// Get a fieldCtx from the pool
+		ctx := fieldCtxPool.Get().(*FieldCtx)
+		val := f.Interface()
+		ctx.Field = f
+		ctx.Name = fname
+		ctx.Value = val
+		ctx.Type = reflect.TypeOf(val).Name()
+		ctx.NumFields = numFields
+		ctx.Index = i
+		ctx.Tags = ctx.Tags[:0]
+		for _, t := range tagsToGet {
+			if ftag, ok := rt.Field(i).Tag.Lookup(t); ok {
+				ctx.Tags = append(ctx.Tags, ftag)
+			}
+		}
+		ok := fn(*ctx)
+		if !ok {
+			ctx.Reset()
+			fieldCtxPool.Put(ctx)
+			break
+		}
+		ctx.Reset()
+		fieldCtxPool.Put(ctx)
+	}
+	return *strctPtr
 }
