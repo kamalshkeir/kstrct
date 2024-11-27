@@ -114,6 +114,8 @@ func SetReflectFieldValue(fld reflect.Value, value any, isTime ...bool) error {
 			}
 		case bool:
 			fld.SetBool(v)
+		case *bool:
+			fld.SetBool(*v)
 		case string:
 			if v == "1" || v == "true" {
 				fld.SetBool(true)
@@ -122,7 +124,15 @@ func SetReflectFieldValue(fld reflect.Value, value any, isTime ...bool) error {
 			} else {
 				errReturn = fmt.Errorf("invalid bool string value: %v", v)
 			}
-		case int, int64, int32, uint, uint64, float32, float64, uint32, Iint, Iint16, Iint32, Iint64, Iint8, Iuint, Iuint64, Iuint32, Iuint16, Iuint8, Ifloat64, Ifloat32:
+		case *string:
+			if *v == "1" || *v == "true" {
+				fld.SetBool(true)
+			} else if *v == "0" || *v == "false" {
+				fld.SetBool(false)
+			} else {
+				errReturn = fmt.Errorf("invalid bool string value: %v", v)
+			}
+		case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64, Iint, Iint16, Iint32, Iint64, Iint8, Iuint, Iuint64, Iuint32, Iuint16, Iuint8, Ifloat64, Ifloat32:
 			// Convert numeric values to boolean values
 			if Debug {
 				fmt.Printf("value: %v, typeValue: %T %v \n", v, v, v == 0)
@@ -137,6 +147,22 @@ func SetReflectFieldValue(fld reflect.Value, value any, isTime ...bool) error {
 			} else {
 				fld.SetBool(false)
 			}
+		case *int, *int8, *int16, *int32, *int64, *uint, *uint8, *uint16, *uint32, *uint64, *float32, *float64:
+			// Convert numeric values to boolean values
+			if Debug {
+				fmt.Printf("value: %v, typeValue: %T %v \n", v, v, v == 0)
+			}
+			if vToSet.Int() == 0 {
+				fld.SetBool(false)
+			} else {
+				fld.SetBool(true)
+			}
+			if float32(vToSet.Float()) != float32(0) {
+				fld.SetBool(true)
+			} else {
+				fld.SetBool(false)
+			}
+
 		case KV:
 			return SetReflectFieldValue(fld, v.Value)
 		default:
@@ -144,6 +170,7 @@ func SetReflectFieldValue(fld reflect.Value, value any, isTime ...bool) error {
 				fld.Set(vToSet)
 			} else {
 				errReturn = fmt.Errorf("zero value setted: cannot assign value of type %s to field of type %s", vToSet.Type(), fld.Type())
+				return errReturn
 			}
 		}
 		return errReturn
