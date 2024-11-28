@@ -12,6 +12,18 @@ type Something struct {
 	CreatedAt time.Time
 }
 
+// cpu: Intel(R) Core(TM) i5-7300HQ CPU @ 2.50GHz
+// BenchmarkFillFromMap-4                   1536951               745.6 ns/op           408 B/op          4 allocs/op
+// BenchmarkFillFromKV-4                    3356922               355.5 ns/op            48 B/op          1 allocs/op
+// BenchmarkFrom-4                          2882827               434.9 ns/op            56 B/op          4 allocs/op
+// BenchmarkRange-4                         3131361               379.2 ns/op            56 B/op          4 allocs/op
+// BenchmarkFill-4                          3929871               306.1 ns/op             0 B/op          0 allocs/op
+// BenchmarkFillM-4                         2054829               579.4 ns/op            24 B/op          1 allocs/op
+// BenchmarkMapstructure-4                   356590              3218 ns/op            1496 B/op         31 allocs/op
+// BenchmarkMapstructureDecoder-4            404091              2980 ns/op            1344 B/op         28 allocs/op
+// PASS
+// ok      github.com/kamalshkeir/kstrct   12.692s
+
 func BenchmarkFillFromMap(b *testing.B) {
 	t := time.Now()
 	a := Something{}

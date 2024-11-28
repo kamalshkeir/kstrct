@@ -77,7 +77,7 @@ func SetReflectFieldValue(fld reflect.Value, value any, isTime ...bool) error {
 		}
 	}()
 	vToSet := reflect.ValueOf(value)
-	if vToSet.Kind() == fld.Kind() {
+	if vToSet.Kind() == fld.Kind() && fld.Kind() != reflect.Slice {
 		fld.Set(vToSet)
 		return nil
 	}
@@ -504,41 +504,137 @@ func SetReflectFieldValue(fld reflect.Value, value any, isTime ...bool) error {
 		typeName := targetType.String()
 		if typeName[0] == '[' {
 			array := reflect.New(targetType).Elem()
-			for _, v := range strings.Split(fmt.Sprintf("%v", value), ",") {
-				v = strings.TrimSpace(v)
-				switch typeName[2:] {
-				case "string":
-					array = reflect.Append(array, reflect.ValueOf(v))
-				case "int":
-					if vv, err := strconv.Atoi(v); err == nil {
-						array = reflect.Append(array, reflect.ValueOf(vv))
+
+			switch vToSet.Kind() {
+			case reflect.String:
+				// valueToSet string comma separated
+				item := array.Type().Elem()
+				switch item.Kind() {
+				case reflect.String:
+					array.Set(reflect.ValueOf(strings.Split(value.(string), ",")))
+				case reflect.Int:
+					for _, v := range strings.Split(value.(string), ",") {
+						if vv, err := strconv.Atoi(v); err != nil {
+							return err
+						} else {
+							array.Set(reflect.Append(array, reflect.ValueOf(vv)))
+						}
 					}
-				case "int64":
-					if vv, err := strconv.Atoi(v); err == nil {
-						array = reflect.Append(array, reflect.ValueOf(int64(vv)))
+				case reflect.Int64:
+					for _, v := range strings.Split(value.(string), ",") {
+						if vv, err := strconv.Atoi(v); err != nil {
+							return err
+						} else {
+							array.Set(reflect.Append(array, reflect.ValueOf(int64(vv))))
+						}
 					}
-				case "uint":
-					if vv, err := strconv.ParseUint(v, 10, 64); err == nil {
-						array = reflect.Append(array, reflect.ValueOf(uint(vv)))
+				case reflect.Int32:
+					for _, v := range strings.Split(value.(string), ",") {
+						if vv, err := strconv.Atoi(v); err != nil {
+							return err
+						} else {
+							array.Set(reflect.Append(array, reflect.ValueOf(int32(vv))))
+						}
 					}
-				case "uint8":
-					if vv, err := strconv.ParseUint(v, 10, 8); err == nil {
-						array = reflect.Append(array, reflect.ValueOf(uint8(vv)))
+				case reflect.Uint:
+					for _, v := range strings.Split(value.(string), ",") {
+						if vv, err := strconv.Atoi(v); err != nil {
+							return err
+						} else {
+							array.Set(reflect.Append(array, reflect.ValueOf(uint(vv))))
+						}
 					}
-				case "float64":
-					if vv, err := strconv.ParseFloat(v, 64); err == nil {
-						array = reflect.Append(array, reflect.ValueOf(vv))
+				case reflect.Uint64:
+					for _, v := range strings.Split(value.(string), ",") {
+						if vv, err := strconv.Atoi(v); err != nil {
+							return err
+						} else {
+							array.Set(reflect.Append(array, reflect.ValueOf(uint64(vv))))
+						}
 					}
+				case reflect.Uint32:
+					for _, v := range strings.Split(value.(string), ",") {
+						if vv, err := strconv.Atoi(v); err != nil {
+							return err
+						} else {
+							array.Set(reflect.Append(array, reflect.ValueOf(uint32(vv))))
+						}
+					}
+				case reflect.Int16:
+					for _, v := range strings.Split(value.(string), ",") {
+						if vv, err := strconv.Atoi(v); err != nil {
+							return err
+						} else {
+							array.Set(reflect.Append(array, reflect.ValueOf(int16(vv))))
+						}
+					}
+				case reflect.Uint16:
+					for _, v := range strings.Split(value.(string), ",") {
+						if vv, err := strconv.Atoi(v); err != nil {
+							return err
+						} else {
+							array.Set(reflect.Append(array, reflect.ValueOf(uint16(vv))))
+						}
+					}
+				case reflect.Int8:
+					for _, v := range strings.Split(value.(string), ",") {
+						if vv, err := strconv.Atoi(v); err != nil {
+							return err
+						} else {
+							array.Set(reflect.Append(array, reflect.ValueOf(int8(vv))))
+						}
+					}
+				case reflect.Uint8:
+					for _, v := range strings.Split(value.(string), ",") {
+						if vv, err := strconv.Atoi(v); err != nil {
+							return err
+						} else {
+							array.Set(reflect.Append(array, reflect.ValueOf(uint8(vv))))
+						}
+					}
+				case reflect.Float64:
+					for _, v := range strings.Split(value.(string), ",") {
+						if vv, err := strconv.ParseFloat(v, 64); err != nil {
+							return err
+						} else {
+							array.Set(reflect.Append(array, reflect.ValueOf(vv)))
+						}
+					}
+				case reflect.Float32:
+					for _, v := range strings.Split(value.(string), ",") {
+						if vv, err := strconv.ParseFloat(v, 32); err != nil {
+							return err
+						} else {
+							array.Set(reflect.Append(array, reflect.ValueOf(float32(vv))))
+						}
+					}
+				case reflect.Bool:
+					for _, v := range strings.Split(value.(string), ",") {
+						if vv, err := strconv.ParseBool(v); err != nil {
+							return err
+						} else {
+							array.Set(reflect.Append(array, reflect.ValueOf(vv)))
+						}
+					}
+
 				default:
-					strctElement := reflect.New(fld.Type().Elem()).Elem() // Create a new instance of strctElement for each iteration
-					err := SetReflectFieldValue(strctElement, vToSet.Interface())
+					return fmt.Errorf("unsupported slice type (comma separated): %v", item.Kind())
+				}
+
+			case reflect.Slice:
+				for i := 0; i < vToSet.Len(); i++ {
+					elem := reflect.New(fld.Type().Elem()).Elem() // Create a new instance of strctElement for each iteration
+					err := SetReflectFieldValue(elem, vToSet.Index(i).Interface())
 					if err != nil {
 						fmt.Println("err set nested:", err)
 						return err
 					}
-					array = reflect.Append(array, strctElement) // Append strctElement to the array
+					array = reflect.Append(array, elem)
 				}
+			default:
+				return fmt.Errorf("value to set is neither string or slice, got: %v", vToSet.Kind())
 			}
+
 			fld.Set(array)
 		}
 		return errReturn
