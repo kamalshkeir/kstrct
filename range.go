@@ -16,6 +16,16 @@ type FieldCtx struct {
 	Tags      []string
 }
 
+func (ctx *FieldCtx) Reset() {
+	ctx.NumFields = 0
+	ctx.Index = 0
+	ctx.Field = reflect.Value{}
+	ctx.Name = ""
+	ctx.Value = nil
+	ctx.Type = ""
+	ctx.Tags = ctx.Tags[:0]
+}
+
 func (ctx *FieldCtx) SetFieldValue(value any) error {
 	return TrySet(ctx.Field, value)
 }
@@ -34,15 +44,18 @@ func From(strctPtr any, tagsToGet ...string) iter.Seq2[int, FieldCtx] {
 		rs := reflect.ValueOf(strctPtr).Elem()
 		rt := rs.Type()
 		numFields := rs.NumField()
-		strctName := rt.Name()
 
-		// Get or create field index cache
-		cache, ok := cacheFieldsIndex.Get(strctName)
+		// Use the same caching mechanism as Fill
+		cacheKey := rt.String()
+		cache, ok := cacheFieldsIndex.Get(cacheKey)
 		if !ok {
 			cache = &fieldCache{
 				names: make([]string, numFields),
 			}
-			cacheFieldsIndex.Set(strctName, cache)
+			for i := 0; i < numFields; i++ {
+				cache.names[i] = ToSnakeCase(rt.Field(i).Name)
+			}
+			cacheFieldsIndex.Set(cacheKey, cache)
 		}
 
 		// Get a single context to reuse
@@ -50,20 +63,16 @@ func From(strctPtr any, tagsToGet ...string) iter.Seq2[int, FieldCtx] {
 		defer fieldCtxPool.Put(ctx)
 
 		for i := 0; i < numFields; i++ {
+			ctx.Reset()
 			f := rs.Field(i)
-			if cache.names[i] == "" {
-				cache.names[i] = ToSnakeCase(rt.Field(i).Name)
-			}
-
 			val := f.Interface()
 			ctx.Field = f
-			ctx.Name = cache.names[i]
+			ctx.Name = cache.names[i] // Use cached name
 			ctx.Value = val
 			ctx.Type = f.Type().Name()
 			ctx.NumFields = numFields
 			ctx.Index = i
 			ctx.Tags = ctx.Tags[:0]
-
 			for _, t := range tagsToGet {
 				if ftag, ok := rt.Field(i).Tag.Lookup(t); ok {
 					ctx.Tags = append(ctx.Tags, ftag)
@@ -82,15 +91,18 @@ func Range(strctPtr any, fn func(FieldCtx) bool, tagsToGet ...string) {
 	rs := reflect.ValueOf(strctPtr).Elem()
 	rt := rs.Type()
 	numFields := rs.NumField()
-	strctName := rt.Name()
 
-	// Get or create field index cache
-	cache, ok := cacheFieldsIndex.Get(strctName)
+	// Use the same caching mechanism as Fill
+	cacheKey := rt.String()
+	cache, ok := cacheFieldsIndex.Get(cacheKey)
 	if !ok {
 		cache = &fieldCache{
 			names: make([]string, numFields),
 		}
-		cacheFieldsIndex.Set(strctName, cache)
+		for i := 0; i < numFields; i++ {
+			cache.names[i] = ToSnakeCase(rt.Field(i).Name)
+		}
+		cacheFieldsIndex.Set(cacheKey, cache)
 	}
 
 	// Get a single context to reuse
@@ -98,20 +110,16 @@ func Range(strctPtr any, fn func(FieldCtx) bool, tagsToGet ...string) {
 	defer fieldCtxPool.Put(ctx)
 
 	for i := 0; i < numFields; i++ {
+		ctx.Reset()
 		f := rs.Field(i)
-		if cache.names[i] == "" {
-			cache.names[i] = ToSnakeCase(rt.Field(i).Name)
-		}
-
 		val := f.Interface()
 		ctx.Field = f
-		ctx.Name = cache.names[i]
+		ctx.Name = cache.names[i] // Use cached name
 		ctx.Value = val
 		ctx.Type = f.Type().Name()
 		ctx.NumFields = numFields
 		ctx.Index = i
 		ctx.Tags = ctx.Tags[:0]
-
 		for _, t := range tagsToGet {
 			if ftag, ok := rt.Field(i).Tag.Lookup(t); ok {
 				ctx.Tags = append(ctx.Tags, ftag)
