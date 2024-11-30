@@ -402,14 +402,39 @@ loop:
 	for i := 0; i < numFields; i++ {
 		field := rs.Field(i)
 		fname := cache.names[i]
-
+		nestedKVs := []KV{}
 		for _, v := range fields_values {
 			if v.Key == fname {
 				if err := SetReflectFieldValue(field, v.Value); err != nil {
 					return err
 				}
 				continue loop
+			} else if strings.HasPrefix(v.Key, fname) {
+				// nested
+				nestedKVs = append(nestedKVs, KV{
+					Key:   strings.TrimPrefix(v.Key, fname+"."),
+					Value: v.Value,
+				})
 			}
+		}
+		if len(nestedKVs) == 0 {
+			continue loop
+		}
+		if field.Kind() == reflect.Pointer && field.IsNil() {
+			field.Set(reflect.New(field.Type().Elem()))
+		}
+		if field.Kind() == reflect.Struct || (field.Kind() == reflect.Pointer && field.Elem().Kind() == reflect.Struct) {
+			return SetReflectFieldValue(field, nestedKVs)
+		} else if field.Kind() == reflect.Slice || (field.Kind() == reflect.Pointer && field.Elem().Kind() == reflect.Slice) {
+			if field.Kind() == reflect.Pointer {
+				field = field.Elem()
+			}
+			newElem := reflect.New(field.Type().Elem()).Elem()
+			err = SetReflectFieldValue(newElem, nestedKVs)
+			if err != nil {
+				return err
+			}
+			field.Set(reflect.Append(field, newElem))
 		}
 	}
 	return err
