@@ -1,6 +1,7 @@
 package kstrct
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -23,6 +24,34 @@ type WeekTimeslots struct {
 	Sunday    []string
 }
 
+type WeekTimeslotss struct {
+	Id         uint      `korm:"pk" json:"id,omitempty"`
+	DoctorId   uint      `korm:"fk:doctors.id:cascade:cascade" json:"doctor_id,omitempty"`
+	Sunday     []string  `json:"sunday,omitempty"`
+	Monday     []string  `json:"monday,omitempty"`
+	Tuesday    []string  `json:"tuesday,omitempty"`
+	Wednesday  []string  `json:"wednesday,omitempty"`
+	Thursday   []string  `json:"thursday,omitempty"`
+	Friday     []string  `json:"friday,omitempty"`
+	Saturday   []string  `json:"saturday,omitempty"`
+	Indx       uint8     `json:"indx,omitempty"`
+	LastUpdate time.Time `korm:"update" json:"-"`
+}
+
+type Reservation struct {
+	Id        uint       `korm:"pk" json:"id,omitempty"`
+	DoctorId  uint       `korm:"fk:doctors.id:cascade:cascade" json:"doctor_id,omitempty"`
+	PatientId uint       `korm:"fk:patients.id:cascade:cascade" json:"patient_id,omitempty"`
+	Day       uint8      `korm:"check: day >= 0 AND day <= 6" json:"day,omitempty"`
+	Timeslot  string     `json:"timeslot,omitempty"`
+	IsVisio   bool       `json:"is_visio,omitempty"`
+	VisioLink string     `json:"visio_link,omitempty"`
+	Motif     string     `json:"motif,omitempty" korm:"text"`
+	Date      *time.Time `json:"date,omitempty"`
+	UpdatedAt time.Time  `korm:"update" json:"updated_at,omitempty"`
+	CreatedAt time.Time  `korm:"now" json:"-"`
+}
+
 type Doctor struct {
 	Name          string
 	WeekTimeslots *[]WeekTimeslots
@@ -31,6 +60,62 @@ type Doctor struct {
 type DoctorS struct {
 	Name          string
 	WeekTimeslots *WeekTimeslots
+}
+
+type Docto struct {
+	Id               uint           `korm:"pk" json:"id,omitempty"`
+	Uuid             string         `korm:"size:40" json:"uuid,omitempty"`
+	Email            string         `korm:"iunique" json:"email,omitempty"`
+	Number           string         `korm:"iunique" json:"number,omitempty"`
+	ExtraNumber      string         `korm:"iunique" json:"extra_number,omitempty"`
+	Password         string         `json:"-"`
+	Name             string         `json:"name,omitempty"`
+	Slug             string         `json:"slug,omitempty"`
+	Address          string         `json:"address,omitempty"`
+	ExtraAddress     string         `json:"extra_address,omitempty"`
+	Prefix           string         `korm:"size:50" json:"prefix,omitempty"`
+	City             string         `korm:"fk:cities.name:cascade:cascade" json:"city,omitempty"`
+	Image            string         `json:"image,omitempty"`
+	Kind             string         `json:"kind,omitempty"`
+	Speciality       string         `korm:"fk:specialities.name:cascade:cascade" json:"speciality,omitempty"`
+	Link             string         `json:"link,omitempty"`
+	RegulationSector string         `json:"regulation_sector,omitempty"`
+	Description      string         `json:"description,omitempty"`
+	ExtraInfos       string         `json:"extra_infos,omitempty"`
+	Languages        []string       `json:"languages,omitempty"`
+	IsVisio          bool           `json:"is_visio"`
+	IsAvailable      bool           `json:"is_available"`
+	BackAt           *time.Time     `json:"back_at,omitempty"`
+	IsBlocked        bool           `json:"-"`
+	AcceptFirst      bool           `json:"accept_first"`
+	Latitude         float64        `json:"latitude,omitempty"`
+	Longitude        float64        `json:"longitude,omitempty"`
+	WeekTimeslots    WeekTimeslotss `json:"week_timeslots,omitempty"`
+	Reservations     []Reservation  `json:"reservations,omitempty"`
+	VisitTypes       []string       `json:"visit_types"`
+	CreatedAt        time.Time      `korm:"now" json:"-"`
+}
+
+func TestFillDocto(t *testing.T) {
+	u := &Docto{}
+	err := Fill(u, []KV{
+		{Key: "uuid", Value: "xxx-xxx-xxx"},
+		{Key: "name", Value: "kamal"},
+		{Key: "languages", Value: "fr,en,es"},
+		{Key: "back_at", Value: time.Now()},
+		{Key: "is_blocked", Value: true},
+		{Key: "week_timeslots.sunday", Value: "8:00,9:00,10:00"},
+		{Key: "week_timeslots.monday", Value: "10:00,11:00,12:00"},
+		{Key: "reservations.id", Value: 1},
+		{Key: "reservations.patient_id", Value: 12345},
+		{Key: "visit_types", Value: "bla,bla2,bla3,bla4"},
+	})
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	fmt.Println("*********")
+	fmt.Printf("%+v", u)
 }
 
 func TestFillNestedFieldsSlice(t *testing.T) {

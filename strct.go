@@ -16,7 +16,7 @@ var (
 	cacheFieldsIndex = kmap.New[string, *fieldCache]()
 	kvPool           = sync.Pool{
 		New: func() any {
-			s := make([]KV, 0, 32)
+			s := make([]KV, 0, 50)
 			return &s
 		},
 	}
@@ -424,17 +424,19 @@ loop:
 			field.Set(reflect.New(field.Type().Elem()))
 		}
 		if field.Kind() == reflect.Struct || (field.Kind() == reflect.Pointer && field.Elem().Kind() == reflect.Struct) {
-			return SetReflectFieldValue(field, nestedKVs)
+			err := SetReflectFieldValue(field, nestedKVs)
+			if err != nil {
+				fmt.Println("err set struct", field.Interface(), nestedKVs)
+			}
+			continue loop
 		} else if field.Kind() == reflect.Slice || (field.Kind() == reflect.Pointer && field.Elem().Kind() == reflect.Slice) {
 			if field.Kind() == reflect.Pointer {
 				field = field.Elem()
 			}
-			newElem := reflect.New(field.Type().Elem()).Elem()
-			err = SetReflectFieldValue(newElem, nestedKVs)
+			err = SetReflectFieldValue(field, nestedKVs)
 			if err != nil {
-				return err
+				fmt.Println("err set slice", field.Interface(), nestedKVs)
 			}
-			field.Set(reflect.Append(field, newElem))
 		}
 	}
 	return err

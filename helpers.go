@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -504,7 +505,28 @@ func SetReflectFieldValue(fld reflect.Value, value any, isTime ...bool) error {
 		typeName := targetType.String()
 		if typeName[0] == '[' {
 			array := reflect.New(targetType).Elem()
+			if valueKVs, ok := value.([]KV); ok && strings.Contains(typeName, ".") {
+				elem := reflect.New(fld.Type().Elem()).Elem() // Create a new instance of strctElement
+				var numFields int
+				if elem.Kind() == reflect.Pointer && elem.IsNil() {
+					elem.Set(reflect.New(elem.Type().Elem()))
+					numFields = elem.Elem().NumField()
+				} else {
+					numFields = elem.NumField()
+				}
 
+				for vv := range slices.Chunk(valueKVs, numFields) {
+					ee := elem.Addr()
+					err := SetReflectFieldValue(ee, vv)
+					if err != nil {
+						fmt.Println("err set nested:", err)
+						return err
+					}
+					array = reflect.Append(array, elem)
+				}
+				fld.Set(array)
+				return nil
+			}
 			switch vToSet.Kind() {
 			case reflect.String:
 				// valueToSet string comma separated
@@ -620,7 +642,6 @@ func SetReflectFieldValue(fld reflect.Value, value any, isTime ...bool) error {
 				default:
 					return fmt.Errorf("unsupported slice type (comma separated): %v", item.Kind())
 				}
-
 			case reflect.Slice:
 				for i := 0; i < vToSet.Len(); i++ {
 					elem := reflect.New(fld.Type().Elem()).Elem() // Create a new instance of strctElement for each iteration
