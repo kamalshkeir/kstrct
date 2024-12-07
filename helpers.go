@@ -227,19 +227,19 @@ func SetReflectFieldValue(fld reflect.Value, value any, isTime ...bool) error {
 		case int32:
 			fld.SetUint(uint64(v))
 		case Istring:
-			if v, err := strconv.Atoi(v.String()); err == nil {
+			if v, err := strconv.Atoi(strings.TrimSpace(v.String())); err == nil {
 				fld.SetUint(uint64(v))
 			}
 		case string:
-			if v, err := strconv.Atoi(v); err == nil {
+			if v, err := strconv.Atoi(strings.TrimSpace(v)); err == nil {
 				fld.SetUint(uint64(v))
 			}
 		case Ibyte:
-			if v, err := strconv.Atoi(string(v.Byte())); err == nil {
+			if v, err := strconv.Atoi(strings.TrimSpace(string(v.Byte()))); err == nil {
 				fld.SetUint(uint64(v))
 			}
 		case []byte:
-			if v, err := strconv.Atoi(string(v)); err == nil {
+			if v, err := strconv.Atoi(strings.TrimSpace(string(v))); err == nil {
 				fld.SetUint(uint64(v))
 			}
 		case Ifloat64:
@@ -291,19 +291,19 @@ func SetReflectFieldValue(fld reflect.Value, value any, isTime ...bool) error {
 		case int8:
 			fld.SetInt(int64(v))
 		case Istring:
-			if v, err := strconv.Atoi(v.String()); err == nil {
+			if v, err := strconv.Atoi(strings.TrimSpace(v.String())); err == nil {
 				fld.SetInt(int64(v))
 			}
 		case string:
-			if v, err := strconv.Atoi(v); err == nil {
+			if v, err := strconv.Atoi(strings.TrimSpace(v)); err == nil {
 				fld.SetInt(int64(v))
 			}
 		case Ibyte:
-			if v, err := strconv.Atoi(string(v.Byte())); err == nil {
+			if v, err := strconv.Atoi(strings.TrimSpace(string(v.Byte()))); err == nil {
 				fld.SetInt(int64(v))
 			}
 		case []byte:
-			if v, err := strconv.Atoi(string(v)); err == nil {
+			if v, err := strconv.Atoi(strings.TrimSpace(string(v))); err == nil {
 				fld.SetInt(int64(v))
 			}
 		case Ifloat64:
@@ -324,7 +324,6 @@ func SetReflectFieldValue(fld reflect.Value, value any, isTime ...bool) error {
 			}
 		}
 		return errReturn
-
 	case reflect.Struct:
 		if v, ok := fld.Addr().Interface().(sql.Scanner); ok {
 			// nulltype
@@ -340,37 +339,17 @@ func SetReflectFieldValue(fld reflect.Value, value any, isTime ...bool) error {
 			}
 			return nil
 		}
+
 		switch v := value.(type) {
 		case map[string]any:
-			for i := 0; i < fld.NumField(); i++ {
-				field := fld.Field(i)
-				tfield := fld.Type().Field(i)
-				fname := tfield.Name
-				if neww, ok := v[ToSnakeCase(fname)]; ok {
-					err := SetReflectFieldValue(field, neww)
-					if err != nil {
-						return err
-					}
-				} else if kstrctTag, ok := tfield.Tag.Lookup("kname"); ok {
-					if kstrctTag == "-" {
-						continue
-					}
-					if val, ok := v[kstrctTag]; ok {
-						err := SetReflectFieldValue(field, val)
-						if err != nil {
-							return err
-						}
-					}
-				} else {
-					sl := []KV{}
-					for k, vv := range v {
-						sl = append(sl, KV{Key: k, Value: vv})
-					}
-					err := FillFromKV(fld.Addr().Interface(), sl, true)
-					if err != nil {
-						return err
-					}
+			if fld.CanAddr() {
+				err := FillM(fld.Addr().Interface(), v)
+				if err != nil {
+					return err
 				}
+				fmt.Printf("Filling from map: %T %+v %v\n", fld.Addr().Interface(), fld.Addr().Interface(), v)
+			} else {
+				return fmt.Errorf("cannot address field %v", fld.Type())
 			}
 		case map[int]any:
 			for i, value := range v {
@@ -381,7 +360,7 @@ func SetReflectFieldValue(fld reflect.Value, value any, isTime ...bool) error {
 				}
 			}
 		case []KV:
-			err := FillFromKV(fld.Addr().Interface(), v, true)
+			err := Fill(fld.Addr().Interface(), v, true)
 			if err != nil {
 				return err
 			}
@@ -470,22 +449,22 @@ func SetReflectFieldValue(fld reflect.Value, value any, isTime ...bool) error {
 		case float32:
 			fld.SetFloat(float64(v))
 		case Istring:
-			f64, err := strconv.ParseFloat(v.String(), 64)
+			f64, err := strconv.ParseFloat(strings.TrimSpace(v.String()), 64)
 			if err == nil {
 				fld.SetFloat(f64)
 			}
 		case string:
-			f64, err := strconv.ParseFloat(v, 64)
+			f64, err := strconv.ParseFloat(strings.TrimSpace(v), 64)
 			if err == nil {
 				fld.SetFloat(f64)
 			}
 		case Ibyte:
-			f64, err := strconv.ParseFloat(string(v.Byte()), 64)
+			f64, err := strconv.ParseFloat(strings.TrimSpace(string(v.Byte())), 64)
 			if err == nil {
 				fld.SetFloat(f64)
 			}
 		case []byte:
-			f64, err := strconv.ParseFloat(string(v), 64)
+			f64, err := strconv.ParseFloat(strings.TrimSpace(string(v)), 64)
 			if err == nil {
 				fld.SetFloat(f64)
 			}
@@ -536,7 +515,7 @@ func SetReflectFieldValue(fld reflect.Value, value any, isTime ...bool) error {
 					array.Set(reflect.ValueOf(strings.Split(value.(string), ",")))
 				case reflect.Int:
 					for _, v := range strings.Split(value.(string), ",") {
-						if vv, err := strconv.Atoi(v); err != nil {
+						if vv, err := strconv.Atoi(strings.TrimSpace(v)); err != nil {
 							return err
 						} else {
 							array.Set(reflect.Append(array, reflect.ValueOf(vv)))
@@ -544,7 +523,7 @@ func SetReflectFieldValue(fld reflect.Value, value any, isTime ...bool) error {
 					}
 				case reflect.Int64:
 					for _, v := range strings.Split(value.(string), ",") {
-						if vv, err := strconv.Atoi(v); err != nil {
+						if vv, err := strconv.Atoi(strings.TrimSpace(v)); err != nil {
 							return err
 						} else {
 							array.Set(reflect.Append(array, reflect.ValueOf(int64(vv))))
@@ -552,7 +531,7 @@ func SetReflectFieldValue(fld reflect.Value, value any, isTime ...bool) error {
 					}
 				case reflect.Int32:
 					for _, v := range strings.Split(value.(string), ",") {
-						if vv, err := strconv.Atoi(v); err != nil {
+						if vv, err := strconv.Atoi(strings.TrimSpace(v)); err != nil {
 							return err
 						} else {
 							array.Set(reflect.Append(array, reflect.ValueOf(int32(vv))))
@@ -560,7 +539,7 @@ func SetReflectFieldValue(fld reflect.Value, value any, isTime ...bool) error {
 					}
 				case reflect.Uint:
 					for _, v := range strings.Split(value.(string), ",") {
-						if vv, err := strconv.Atoi(v); err != nil {
+						if vv, err := strconv.Atoi(strings.TrimSpace(v)); err != nil {
 							return err
 						} else {
 							array.Set(reflect.Append(array, reflect.ValueOf(uint(vv))))
@@ -568,7 +547,7 @@ func SetReflectFieldValue(fld reflect.Value, value any, isTime ...bool) error {
 					}
 				case reflect.Uint64:
 					for _, v := range strings.Split(value.(string), ",") {
-						if vv, err := strconv.Atoi(v); err != nil {
+						if vv, err := strconv.Atoi(strings.TrimSpace(v)); err != nil {
 							return err
 						} else {
 							array.Set(reflect.Append(array, reflect.ValueOf(uint64(vv))))
@@ -576,7 +555,7 @@ func SetReflectFieldValue(fld reflect.Value, value any, isTime ...bool) error {
 					}
 				case reflect.Uint32:
 					for _, v := range strings.Split(value.(string), ",") {
-						if vv, err := strconv.Atoi(v); err != nil {
+						if vv, err := strconv.Atoi(strings.TrimSpace(v)); err != nil {
 							return err
 						} else {
 							array.Set(reflect.Append(array, reflect.ValueOf(uint32(vv))))
@@ -584,7 +563,7 @@ func SetReflectFieldValue(fld reflect.Value, value any, isTime ...bool) error {
 					}
 				case reflect.Int16:
 					for _, v := range strings.Split(value.(string), ",") {
-						if vv, err := strconv.Atoi(v); err != nil {
+						if vv, err := strconv.Atoi(strings.TrimSpace(v)); err != nil {
 							return err
 						} else {
 							array.Set(reflect.Append(array, reflect.ValueOf(int16(vv))))
@@ -592,7 +571,7 @@ func SetReflectFieldValue(fld reflect.Value, value any, isTime ...bool) error {
 					}
 				case reflect.Uint16:
 					for _, v := range strings.Split(value.(string), ",") {
-						if vv, err := strconv.Atoi(v); err != nil {
+						if vv, err := strconv.Atoi(strings.TrimSpace(v)); err != nil {
 							return err
 						} else {
 							array.Set(reflect.Append(array, reflect.ValueOf(uint16(vv))))
@@ -600,7 +579,7 @@ func SetReflectFieldValue(fld reflect.Value, value any, isTime ...bool) error {
 					}
 				case reflect.Int8:
 					for _, v := range strings.Split(value.(string), ",") {
-						if vv, err := strconv.Atoi(v); err != nil {
+						if vv, err := strconv.Atoi(strings.TrimSpace(v)); err != nil {
 							return err
 						} else {
 							array.Set(reflect.Append(array, reflect.ValueOf(int8(vv))))
@@ -608,7 +587,7 @@ func SetReflectFieldValue(fld reflect.Value, value any, isTime ...bool) error {
 					}
 				case reflect.Uint8:
 					for _, v := range strings.Split(value.(string), ",") {
-						if vv, err := strconv.Atoi(v); err != nil {
+						if vv, err := strconv.Atoi(strings.TrimSpace(v)); err != nil {
 							return err
 						} else {
 							array.Set(reflect.Append(array, reflect.ValueOf(uint8(vv))))
@@ -616,7 +595,7 @@ func SetReflectFieldValue(fld reflect.Value, value any, isTime ...bool) error {
 					}
 				case reflect.Float64:
 					for _, v := range strings.Split(value.(string), ",") {
-						if vv, err := strconv.ParseFloat(v, 64); err != nil {
+						if vv, err := strconv.ParseFloat(strings.TrimSpace(v), 64); err != nil {
 							return err
 						} else {
 							array.Set(reflect.Append(array, reflect.ValueOf(vv)))
@@ -624,7 +603,7 @@ func SetReflectFieldValue(fld reflect.Value, value any, isTime ...bool) error {
 					}
 				case reflect.Float32:
 					for _, v := range strings.Split(value.(string), ",") {
-						if vv, err := strconv.ParseFloat(v, 32); err != nil {
+						if vv, err := strconv.ParseFloat(strings.TrimSpace(v), 32); err != nil {
 							return err
 						} else {
 							array.Set(reflect.Append(array, reflect.ValueOf(float32(vv))))
@@ -632,7 +611,7 @@ func SetReflectFieldValue(fld reflect.Value, value any, isTime ...bool) error {
 					}
 				case reflect.Bool:
 					for _, v := range strings.Split(value.(string), ",") {
-						if vv, err := strconv.ParseBool(v); err != nil {
+						if vv, err := strconv.ParseBool(strings.TrimSpace(v)); err != nil {
 							return err
 						} else {
 							array.Set(reflect.Append(array, reflect.ValueOf(vv)))

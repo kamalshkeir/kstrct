@@ -225,6 +225,7 @@ loop:
 		fname := ToSnakeCase(rt.Field(i).Name)
 
 		for _, v := range fields_values {
+			v.Key = strings.TrimSpace(v.Key)
 			if v.Key == fname {
 				setErr := SetReflectFieldValue(field, v.Value)
 				if setErr != nil {
@@ -404,6 +405,7 @@ loop:
 		fname := cache.names[i]
 		nestedKVs := []KV{}
 		for _, v := range fields_values {
+			v.Key = strings.TrimSpace(v.Key)
 			if v.Key == fname {
 				if err := SetReflectFieldValue(field, v.Value); err != nil {
 					return err
