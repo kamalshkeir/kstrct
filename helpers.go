@@ -347,7 +347,7 @@ func SetReflectFieldValue(fld reflect.Value, value any, isTime ...bool) error {
 				if err != nil {
 					return err
 				}
-				fmt.Printf("Filling from map: %T %+v %v\n", fld.Addr().Interface(), fld.Addr().Interface(), v)
+				return nil
 			} else {
 				return fmt.Errorf("cannot address field %v", fld.Type())
 			}
@@ -359,6 +359,7 @@ func SetReflectFieldValue(fld reflect.Value, value any, isTime ...bool) error {
 					return err
 				}
 			}
+			return nil
 		case []KV:
 			err := Fill(fld.Addr().Interface(), v, true)
 			if err != nil {
