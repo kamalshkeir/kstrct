@@ -307,13 +307,13 @@ func SetReflectFieldValue(fld reflect.Value, value any, isTime ...bool) error {
 				fld.SetInt(int64(v))
 			}
 		case Ifloat64:
-			fld.SetUint(uint64(v.Float64()))
+			fld.SetInt(int64(v.Float64()))
 		case float64:
-			fld.SetUint(uint64(v))
+			fld.SetInt(int64(v))
 		case Ifloat32:
-			fld.SetUint(uint64(v.Float32()))
+			fld.SetInt(int64(v.Float32()))
 		case float32:
-			fld.SetUint(uint64(v))
+			fld.SetInt(int64(v))
 		case KV:
 			return SetReflectFieldValue(fld, v.Value)
 		default:
