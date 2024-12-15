@@ -428,7 +428,9 @@ loop:
 		if field.Kind() == reflect.Struct || (field.Kind() == reflect.Pointer && field.Elem().Kind() == reflect.Struct) {
 			err := SetReflectFieldValue(field, nestedKVs)
 			if err != nil {
-				fmt.Println("err set struct", field.Interface(), nestedKVs)
+				if Debug {
+					fmt.Println("err set struct", field.Interface(), nestedKVs)
+				}
 			}
 			continue loop
 		} else if field.Kind() == reflect.Slice || (field.Kind() == reflect.Pointer && field.Elem().Kind() == reflect.Slice) {
@@ -437,7 +439,9 @@ loop:
 			}
 			err = SetReflectFieldValue(field, nestedKVs)
 			if err != nil {
-				fmt.Println("err set slice", field.Interface(), nestedKVs)
+				if Debug {
+					fmt.Println("err set slice", field.Interface(), nestedKVs)
+				}
 			}
 		}
 	}
@@ -467,55 +471,3 @@ func FillM(structOrChanPtr any, fields_values map[string]any, nested ...bool) (e
 
 	return err
 }
-
-// func FillPP(structOrChanPtr any, fields_values []KV, nested ...bool) (err error) {
-// 	rs := reflect.ValueOf(structOrChanPtr)
-// 	if rs.Kind() != reflect.Pointer && rs.Kind() == reflect.Struct {
-// 		return ErrorExpectedPtr
-// 	} else if rs.Kind() == reflect.Chan || rs.Elem().Kind() == reflect.Chan {
-// 		if rs.Kind() == reflect.Pointer {
-// 			rs = rs.Elem()
-// 		}
-// 		chanType := reflect.New(rs.Type().Elem()).Elem()
-// 		err := SetReflectFieldValue(chanType, fields_values)
-// 		if err != nil {
-// 			return err
-// 		}
-// 		rs.Send(chanType)
-// 		return nil
-// 	}
-// 	if rs.Kind() == reflect.Pointer {
-// 		rs = rs.Elem()
-// 	}
-// 	rt := rs.Type()
-// 	numFields := rs.NumField()
-
-// 	// Use rt.String() as cache key - simpler and good enough
-// 	cacheKey := rt.String()
-// 	cache, ok := cacheFieldsIndex.Get(cacheKey)
-// 	if !ok {
-// 		cache = make(map[string]string, numFields)
-// 		cacheFieldsIndex.Set(cacheKey, cache)
-// 	}
-
-// loop:
-// 	for i := 0; i < numFields; i++ {
-// 		field := rs.Field(i)
-// 		fieldName := rt.Field(i).Name
-// 		fname, ok := cache[fieldName]
-// 		if !ok {
-// 			fname = ToSnakeCase(fieldName)
-// 			cache[fieldName] = fname
-// 		}
-
-// 		for _, v := range fields_values {
-// 			if v.Key == fname {
-// 				if err := SetReflectFieldValue(field, v.Value); err != nil {
-// 					return err
-// 				}
-// 				continue loop
-// 			}
-// 		}
-// 	}
-// 	return err
-// }
