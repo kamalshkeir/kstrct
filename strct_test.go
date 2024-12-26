@@ -361,3 +361,168 @@ func BenchmarkFillM(b *testing.B) {
 		}
 	}
 }
+
+func TestCreateStruct(t *testing.T) {
+	// Define fields for our dynamic struct
+	fields := []StructField{
+		{
+			Name: "ID",
+			Type: reflect.TypeOf(0),
+			Tags: map[string]string{
+				"json": "id,omitempty",
+				"korm": "pk",
+			},
+			Value: 1,
+		},
+		{
+			Name: "Name",
+			Type: reflect.TypeOf(""),
+			Tags: map[string]string{
+				"json": "name,omitempty",
+			},
+			Value: "John Doe",
+		},
+		{
+			Name: "CreatedAt",
+			Type: reflect.TypeOf(time.Time{}),
+			Tags: map[string]string{
+				"json": "-",
+				"korm": "update",
+			},
+			Value: time.Now(),
+		},
+	}
+
+	// Create the struct
+	dynamicStruct, err := CreateStruct(fields)
+	if err != nil {
+		t.Fatalf("Failed to create struct: %v", err)
+	}
+
+	// Verify the struct was created correctly
+	val := reflect.ValueOf(dynamicStruct).Elem()
+	typ := val.Type()
+
+	// Check number of fields
+	if typ.NumField() != len(fields) {
+		t.Errorf("Expected %d fields, got %d", len(fields), typ.NumField())
+	}
+
+	// Check field types and tags
+	for i, field := range fields {
+		structField := typ.Field(i)
+
+		// Check name
+		if structField.Name != field.Name {
+			t.Errorf("Field %d: expected name %s, got %s", i, field.Name, structField.Name)
+		}
+
+		// Check type
+		if structField.Type != field.Type {
+			t.Errorf("Field %d: expected type %v, got %v", i, field.Type, structField.Type)
+		}
+
+		// Check tags
+		for key, expectedValue := range field.Tags {
+			if gotValue, ok := structField.Tag.Lookup(key); !ok || gotValue != expectedValue {
+				t.Errorf("Field %d: expected tag %s:\"%s\", got %s:\"%s\"", i, key, expectedValue, key, gotValue)
+			}
+		}
+
+		// Check value
+		if field.Value != nil {
+			fieldValue := val.Field(i).Interface()
+			if !reflect.DeepEqual(fieldValue, field.Value) {
+				t.Errorf("Field %d: expected value %v, got %v", i, field.Value, fieldValue)
+			}
+		}
+	}
+}
+
+func TestExtractStructFields(t *testing.T) {
+	// Create a test struct
+	type TestStruct struct {
+		ID        uint      `json:"id,omitempty" korm:"pk"`
+		Name      string    `json:"name,omitempty"`
+		CreatedAt time.Time `json:"-" korm:"update"`
+	}
+
+	testValue := TestStruct{
+		ID:        1,
+		Name:      "Test",
+		CreatedAt: time.Now(),
+	}
+
+	// Extract fields
+	fields, err := ExtractStructFields(&testValue)
+	if err != nil {
+		t.Fatalf("Failed to extract struct fields: %v", err)
+	}
+
+	// Verify number of fields
+	if len(fields) != 3 {
+		t.Errorf("Expected 3 fields, got %d", len(fields))
+	}
+
+	// Verify field details
+	expectedFields := map[string]struct {
+		fieldType reflect.Type
+		tags      map[string]string
+		value     any
+	}{
+		"ID": {
+			fieldType: reflect.TypeOf(uint(0)),
+			tags: map[string]string{
+				"json": "id,omitempty",
+				"korm": "pk",
+			},
+			value: uint(1),
+		},
+		"Name": {
+			fieldType: reflect.TypeOf(""),
+			tags: map[string]string{
+				"json": "name,omitempty",
+			},
+			value: "Test",
+		},
+		"CreatedAt": {
+			fieldType: reflect.TypeOf(time.Time{}),
+			tags: map[string]string{
+				"json": "-",
+				"korm": "update",
+			},
+			value: testValue.CreatedAt,
+		},
+	}
+
+	for _, field := range fields {
+		expected, ok := expectedFields[field.Name]
+		if !ok {
+			t.Errorf("Unexpected field: %s", field.Name)
+			continue
+		}
+
+		// Check type
+		if field.Type != expected.fieldType {
+			t.Errorf("Field %s: expected type %v, got %v", field.Name, expected.fieldType, field.Type)
+		}
+
+		// Check tags
+		for key, expectedValue := range expected.tags {
+			if gotValue, ok := field.Tags[key]; !ok || gotValue != expectedValue {
+				t.Errorf("Field %s: expected tag %s:\"%s\", got %s:\"%s\"", field.Name, key, expectedValue, key, gotValue)
+			}
+		}
+
+		// Check value
+		if !reflect.DeepEqual(field.Value, expected.value) {
+			t.Errorf("Field %s: expected value %v, got %v", field.Name, expected.value, field.Value)
+		}
+	}
+
+	// Test error case - non-struct input
+	_, err = ExtractStructFields(42)
+	if err == nil {
+		t.Error("Expected error when passing non-struct value, got nil")
+	}
+}

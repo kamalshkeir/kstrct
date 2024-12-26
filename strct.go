@@ -471,3 +471,98 @@ func FillM(structOrChanPtr any, fields_values map[string]any, nested ...bool) (e
 
 	return err
 }
+
+// StructField represents a field in a dynamic struct
+type StructField struct {
+	Name  string
+	Type  reflect.Type
+	Tags  map[string]string
+	Value any
+}
+
+// CreateStruct dynamically creates a struct type with the given fields and returns a pointer to a new instance
+func CreateStruct(fields []StructField) (any, error) {
+	if len(fields) == 0 {
+		return nil, errors.New("no fields provided")
+	}
+
+	// Create struct fields
+	structFields := make([]reflect.StructField, len(fields))
+	for i, field := range fields {
+		// Build tag string
+		var tags string
+		if len(field.Tags) > 0 {
+			var tagParts []string
+			for key, value := range field.Tags {
+				tagParts = append(tagParts, fmt.Sprintf(`%s:"%s"`, key, value))
+			}
+			tags = strings.Join(tagParts, " ")
+		}
+
+		structFields[i] = reflect.StructField{
+			Name: field.Name,
+			Type: field.Type,
+			Tag:  reflect.StructTag(tags),
+		}
+	}
+
+	// Create the struct type
+	structType := reflect.StructOf(structFields)
+
+	// Create a new instance of the struct
+	structValue := reflect.New(structType)
+
+	// Set initial values if provided
+	for i, field := range fields {
+		if field.Value != nil {
+			err := SetReflectFieldValue(structValue.Elem().Field(i), field.Value)
+			if err != nil {
+				return nil, fmt.Errorf("failed to set field %s: %w", field.Name, err)
+			}
+		}
+	}
+
+	return structValue.Interface(), nil
+}
+
+// ExtractStructFields takes a struct or pointer to struct and returns its fields as []StructField
+func ExtractStructFields(structOrPtr any) ([]StructField, error) {
+	val := reflect.ValueOf(structOrPtr)
+	if val.Kind() == reflect.Ptr {
+		val = val.Elem()
+	}
+
+	if val.Kind() != reflect.Struct {
+		return nil, fmt.Errorf("expected struct or pointer to struct, got %v", val.Kind())
+	}
+
+	typ := val.Type()
+	numFields := typ.NumField()
+	fields := make([]StructField, numFields)
+
+	for i := 0; i < numFields; i++ {
+		field := typ.Field(i)
+		fieldValue := val.Field(i)
+
+		// Extract tags
+		tags := make(map[string]string)
+		if field.Tag != "" {
+			// Get all possible tags from the field
+			for _, key := range []string{"json", "korm", "xml", "yaml", "toml", "db"} {
+				if tag, ok := field.Tag.Lookup(key); ok {
+					tags[key] = tag
+				}
+			}
+		}
+
+		// Create StructField
+		fields[i] = StructField{
+			Name:  field.Name,
+			Type:  field.Type,
+			Tags:  tags,
+			Value: fieldValue.Interface(),
+		}
+	}
+
+	return fields, nil
+}
