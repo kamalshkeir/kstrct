@@ -31,6 +31,14 @@ func SetRFValue(fld reflect.Value, value any) error {
 		return fmt.Errorf("field is not valid or cannot be set")
 	}
 
+	v := reflect.ValueOf(value)
+	if !v.IsValid() {
+		if Debug {
+			fmt.Printf("Skipping invalid value: kind=%v value=%v\n", fld.Kind(), value)
+		}
+		return nil
+	}
+
 	// Handle pointer types
 	if fld.Kind() == reflect.Pointer {
 		if value == nil {
@@ -41,15 +49,10 @@ func SetRFValue(fld reflect.Value, value any) error {
 			fld.Set(reflect.New(fld.Type().Elem()))
 		}
 		// If the value is already a pointer, dereference it
-		if v := reflect.ValueOf(value); v.Kind() == reflect.Ptr {
+		if v.Kind() == reflect.Ptr {
 			return SetRFValue(fld.Elem(), v.Elem().Interface())
 		}
 		return SetRFValue(fld.Elem(), value)
-	}
-
-	v := reflect.ValueOf(value)
-	if !v.IsValid() {
-		return fmt.Errorf("value is not valid")
 	}
 
 	// Handle KV type for nested fields
