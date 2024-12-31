@@ -20,6 +20,7 @@ var (
 			return &s
 		},
 	}
+	Debug = false
 )
 
 type KV struct {
@@ -353,7 +354,7 @@ loop:
 	return err
 }
 
-func Fill(structOrChanPtr any, fields_values []KV, nested ...bool) (err error) {
+func FillOLD(structOrChanPtr any, fields_values []KV, nested ...bool) (err error) {
 	rs := reflect.ValueOf(structOrChanPtr)
 	if rs.Kind() != reflect.Pointer && rs.Kind() == reflect.Struct {
 		return ErrorExpectedPtr
@@ -448,6 +449,37 @@ loop:
 	return err
 }
 
+var errNil = errors.New("got nil structOrChanPtr")
+
+func Fill(structOrChanPtr any, fields_values []KV, nested ...bool) (err error) {
+	if structOrChanPtr == nil {
+		return errNil
+	}
+	rs := reflect.ValueOf(structOrChanPtr)
+	if rs.Kind() != reflect.Pointer && rs.Kind() == reflect.Struct {
+		return ErrorExpectedPtr
+	}
+
+	// Handle channels first
+	if rs.Kind() == reflect.Chan || (rs.Kind() == reflect.Pointer && rs.Elem().Kind() == reflect.Chan) {
+		if rs.Kind() == reflect.Pointer {
+			rs = rs.Elem()
+		}
+		chanType := reflect.New(rs.Type().Elem()).Elem()
+		err := SetReflectFieldValue(chanType, fields_values)
+		if err != nil {
+			return err
+		}
+		rs.Send(chanType)
+		return nil
+	}
+
+	// For non-channel types, use the builder
+	builder := NewBuilder(structOrChanPtr)
+	builder.FromKV(fields_values...)
+	return builder.Error()
+}
+
 func FillM(structOrChanPtr any, fields_values map[string]any, nested ...bool) (err error) {
 	l := len(fields_values)
 	if l == 0 {
@@ -460,7 +492,22 @@ func FillM(structOrChanPtr any, fields_values map[string]any, nested ...bool) (e
 
 	// Fill slice directly
 	for k, v := range fields_values {
-		kvs = append(kvs, KV{k, v})
+		switch mv := v.(type) {
+		case map[string]string:
+			for mk, mv := range mv {
+				kvs = append(kvs, KV{k + "." + mk, mv})
+			}
+		case map[string]int:
+			for mk, mv := range mv {
+				kvs = append(kvs, KV{k + "." + mk, mv})
+			}
+		case map[string]any:
+			for mk, mv := range mv {
+				kvs = append(kvs, KV{k + "." + mk, mv})
+			}
+		default:
+			kvs = append(kvs, KV{k, v})
+		}
 	}
 
 	// Use our zero-allocation optimized function
@@ -470,14 +517,6 @@ func FillM(structOrChanPtr any, fields_values map[string]any, nested ...bool) (e
 	kvPool.Put(kvsp)
 
 	return err
-}
-
-// StructField represents a field in a dynamic struct
-type StructField struct {
-	Name  string
-	Type  reflect.Type
-	Tags  map[string]string
-	Value any
 }
 
 // CreateStruct dynamically creates a struct type with the given fields and returns a pointer to a new instance

@@ -11,8 +11,6 @@ import (
 	"time"
 )
 
-var Debug = false
-
 type Istring interface {
 	String() string
 }

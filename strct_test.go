@@ -1,7 +1,6 @@
 package kstrct
 
 import (
-	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -114,8 +113,6 @@ func TestFillDocto(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	fmt.Println("*********")
-	fmt.Printf("%+v", u)
 }
 
 func TestFillNestedFieldsSlice(t *testing.T) {
@@ -148,7 +145,7 @@ func TestFillNestedFieldsSlice(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var got Doctor
-			err := Fill(&got, tt.input, true)
+			err := Fill(&got, tt.input)
 			if err != nil {
 				t.Errorf("Fill() error = %v", err)
 				return
@@ -200,7 +197,7 @@ func TestFillNestedFieldsStruct(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			var got DoctorS
-			err := Fill(&got, tt.input, true)
+			err := Fill(&got, tt.input)
 			if err != nil {
 				t.Errorf("Fill() error = %v", err)
 				return
