@@ -1,12 +1,71 @@
 package kstrct
 
+import (
+	"sync"
+)
+
 const underscoreByte = '_'
 
+var (
+	snakeCache sync.Map
+	// Pool for byte slices used in snake case conversion
+	bytePool = sync.Pool{
+		New: func() any {
+			// Pre-allocate a reasonably sized buffer
+			b := make([]byte, 0, 64)
+			return &b
+		},
+	}
+	// String intern pool to reduce string allocations
+	stringPool = sync.Pool{
+		New: func() any {
+			return new(string)
+		},
+	}
+)
+
+// internString returns a pooled string to reduce allocations
+func internString(b []byte) string {
+	strPtr := stringPool.Get().(*string)
+	*strPtr = string(b)
+	s := *strPtr
+	stringPool.Put(strPtr)
+	return s
+}
+
+// ToSnakeCase converts a string to snake case with caching
 func ToSnakeCase(s string) string {
+	// Check cache first
+	if cached, ok := snakeCache.Load(s); ok {
+		return cached.(string)
+	}
+
+	// Estimate final size: length + potential underscores
+	// Count uppercase letters to estimate underscore count
+	upperCount := 0
+	for i := 0; i < len(s); i++ {
+		if isUpper(s[i]) {
+			upperCount++
+		}
+	}
+
+	// Get byte slice from pool
+	bPtr := bytePool.Get().(*[]byte)
+	b := *bPtr
+	b = b[:0]
+	// Pre-allocate with exact size estimate
+	if cap(b) < len(s)+upperCount {
+		*bPtr = make([]byte, 0, len(s)+upperCount)
+		b = *bPtr
+	}
+	defer bytePool.Put(bPtr)
+
 	idx := 0
 	hasLower := false
 	hasUnderscore := false
 	lowercaseSinceUnderscore := false
+
+	// First pass: check if we need any changes
 	for ; idx < len(s); idx++ {
 		if isLower(s[idx]) {
 			hasLower = true
@@ -25,10 +84,10 @@ func ToSnakeCase(s string) string {
 	}
 
 	if idx == len(s) {
-		return s // no changes needed, can just borrow the string
+		snakeCache.Store(s, s) // Cache the result
+		return s               // no changes needed, can just borrow the string
 	}
 
-	b := make([]byte, 0, 64)
 	b = append(b, s[:idx]...)
 
 	if isUpper(s[idx]) && (!hasLower || hasUnderscore && !lowercaseSinceUnderscore) {
@@ -63,7 +122,10 @@ func ToSnakeCase(s string) string {
 			idx++
 		}
 	}
-	return string(b) // return manipulated string
+
+	result := internString(b)
+	snakeCache.Store(s, result) // Cache the result
+	return result
 }
 
 func SnakeCaseToTitle(s string) string {

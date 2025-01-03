@@ -3,28 +3,74 @@ package kstrct
 import (
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 	"unsafe"
-
-	"github.com/kamalshkeir/kmap"
 )
+
+const maxFixedFields = 32 // Maximum number of fields to store in fixed array
+
+type fieldInfoMap struct {
+	isFixed    bool
+	fixedSize  int
+	fixedKeys  [maxFixedFields]string
+	fixedInfos [maxFixedFields]fieldInfo
+	mapInfo    map[string]fieldInfo
+}
+
+func newFieldInfoMap(size int) *fieldInfoMap {
+	if size <= maxFixedFields/2 { // Use fixed array if we have room for fields + snake case names
+		return &fieldInfoMap{isFixed: true}
+	}
+	return &fieldInfoMap{
+		isFixed: false,
+		mapInfo: make(map[string]fieldInfo, size*2),
+	}
+}
+
+func (m *fieldInfoMap) set(key string, info fieldInfo) {
+	if m.isFixed {
+		if m.fixedSize < maxFixedFields {
+			m.fixedKeys[m.fixedSize] = key
+			m.fixedInfos[m.fixedSize] = info
+			m.fixedSize++
+		}
+	} else {
+		m.mapInfo[key] = info
+	}
+}
+
+func (m *fieldInfoMap) get(key string) (fieldInfo, bool) {
+	if m.isFixed {
+		for i := 0; i < m.fixedSize; i++ {
+			if m.fixedKeys[i] == key {
+				return m.fixedInfos[i], true
+			}
+		}
+		return fieldInfo{}, false
+	}
+	info, ok := m.mapInfo[key]
+	return info, ok
+}
 
 // StructBuilder provides a fluent interface for struct manipulation
 type StructBuilder struct {
 	ptr        any
-	offsets    *kmap.SafeMap[string, uintptr]
-	fieldTypes *kmap.SafeMap[string, reflect.Type]
+	fields     *fieldInfoMap
 	structType reflect.Type
-	fieldOrder []string
-	snakeCache *kmap.SafeMap[string, string] // Cache for snake case field names
 	err        error
 }
 
+type fieldInfo struct {
+	offset uintptr
+	typ    reflect.Type
+}
+
 var (
-	// Cache for struct builders to avoid recreating them
-	builderCache = kmap.New[string, *StructBuilder]()
+	// Global cache for field info
+	fieldInfoCache sync.Map // map[reflect.Type]map[string]fieldInfo
 	// Common time formats to try in order of preference
 	timeFormats = []string{
 		time.RFC3339,
@@ -77,42 +123,40 @@ func NewBuilder(structPtr any) *StructBuilder {
 	}
 	elemType := typ.Elem()
 
-	// Check cache first
-	if builder, ok := builderCache.Get(elemType.String()); ok {
-		builder.ptr = structPtr
-		builder.err = nil
-		return builder
+	// Try to get field info from cache
+	var fields *fieldInfoMap
+	if cached, ok := fieldInfoCache.Load(elemType); ok {
+		fields = cached.(*fieldInfoMap)
+	} else {
+		// Create new field info map
+		numFields := elemType.NumField()
+		fields = newFieldInfoMap(numFields)
+
+		// Store field info
+		for i := 0; i < numFields; i++ {
+			field := elemType.Field(i)
+			info := fieldInfo{
+				offset: field.Offset,
+				typ:    field.Type,
+			}
+
+			// Store both original and snake case names
+			snakeName := ToSnakeCase(field.Name)
+			fields.set(snakeName, info)
+			if snakeName != field.Name {
+				fields.set(field.Name, info)
+			}
+		}
+
+		// Store in cache
+		fieldInfoCache.Store(elemType, fields)
 	}
 
-	// Create new builder
-	builder := &StructBuilder{
+	return &StructBuilder{
 		ptr:        structPtr,
-		offsets:    kmap.New[string, uintptr](),
-		fieldTypes: kmap.New[string, reflect.Type](),
+		fields:     fields,
 		structType: elemType,
-		fieldOrder: make([]string, 0, elemType.NumField()),
-		snakeCache: kmap.New[string, string](),
-		err:        nil,
 	}
-
-	// Pre-compute all field offsets and types
-	for i := 0; i < elemType.NumField(); i++ {
-		field := elemType.Field(i)
-		// Convert field name to snake case
-		snakeName := ToSnakeCase(field.Name)
-		builder.offsets.Set(snakeName, field.Offset)
-		builder.fieldTypes.Set(snakeName, field.Type)
-		builder.fieldOrder = append(builder.fieldOrder, snakeName)
-		builder.snakeCache.Set(field.Name, snakeName)
-
-		// Also store the original name for backward compatibility
-		builder.offsets.Set(field.Name, field.Offset)
-		builder.fieldTypes.Set(field.Name, field.Type)
-	}
-
-	// Cache the builder
-	builderCache.Set(elemType.String(), builder)
-	return builder
 }
 
 func (b *StructBuilder) Error() error {
@@ -122,8 +166,8 @@ func (b *StructBuilder) Error() error {
 // Set sets a field value by name
 func (b *StructBuilder) Set(fieldPath string, value any) *StructBuilder {
 	// Try direct access first
-	if offset, ok := b.offsets.Get(fieldPath); ok {
-		fieldType, _ := b.fieldTypes.Get(fieldPath)
+	if offset, ok := b.getOffset(fieldPath); ok {
+		fieldType, _ := b.getFieldType(fieldPath)
 		ptr := unsafe.Pointer(uintptr((*emptyInterface)(unsafe.Pointer(&b.ptr)).word) + offset)
 
 		if b.handleDirectSet(fieldPath, offset, value, fieldType) {
@@ -150,8 +194,8 @@ func (b *StructBuilder) Set(fieldPath string, value any) *StructBuilder {
 		defer partsPool.Put(partsPtr)
 
 		rootField := parts[0]
-		if offset, ok := b.offsets.Get(rootField); ok {
-			fieldType, _ := b.fieldTypes.Get(rootField)
+		if offset, ok := b.getOffset(rootField); ok {
+			fieldType, _ := b.getFieldType(rootField)
 			ptr := unsafe.Pointer(uintptr((*emptyInterface)(unsafe.Pointer(&b.ptr)).word) + offset)
 			field := reflect.NewAt(fieldType, ptr).Elem()
 
@@ -231,16 +275,16 @@ func (b *StructBuilder) Get(fieldPath string) any {
 	}
 
 	// Try direct access with original name
-	if offset, ok := b.offsets.Get(fieldPath); ok {
-		fieldType, _ := b.fieldTypes.Get(fieldPath)
+	if offset, ok := b.getOffset(fieldPath); ok {
+		fieldType, _ := b.getFieldType(fieldPath)
 		ptr := unsafe.Pointer(uintptr((*emptyInterface)(unsafe.Pointer(&b.ptr)).word) + offset)
 		return b.getFieldValue(ptr, fieldType)
 	}
 
 	// Try with snake case
 	snakePath := ToSnakeCase(fieldPath)
-	if offset, ok := b.offsets.Get(snakePath); ok {
-		fieldType, _ := b.fieldTypes.Get(snakePath)
+	if offset, ok := b.getOffset(snakePath); ok {
+		fieldType, _ := b.getFieldType(snakePath)
 		ptr := unsafe.Pointer(uintptr((*emptyInterface)(unsafe.Pointer(&b.ptr)).word) + offset)
 		return b.getFieldValue(ptr, fieldType)
 	}
@@ -325,28 +369,27 @@ func (b *StructBuilder) getComplexField(fieldPath string) any {
 
 	// Get root field
 	rootField := parts[0]
-	offset, ok := b.offsets.Get(rootField)
-	if !ok {
-		return nil
-	}
-
-	fieldType, ok := b.fieldTypes.Get(rootField)
-	if !ok {
-		return nil
-	}
-	ptr := GetFieldPointer(b.ptr, offset)
-
-	// Handle pointer to struct
-	if fieldType.Kind() == reflect.Ptr {
-		ptrVal := *(*unsafe.Pointer)(ptr)
-		if ptrVal == nil {
+	if offset, ok := b.getOffset(rootField); ok {
+		fieldType, ok := b.getFieldType(rootField)
+		if !ok {
 			return nil
 		}
-		return b.getFieldValue(ptrVal, fieldType.Elem())
+		ptr := GetFieldPointer(b.ptr, offset)
+
+		// Handle pointer to struct
+		if fieldType.Kind() == reflect.Ptr {
+			ptrVal := *(*unsafe.Pointer)(ptr)
+			if ptrVal == nil {
+				return nil
+			}
+			return b.getFieldValue(ptrVal, fieldType.Elem())
+		}
+
+		// Handle different nested types
+		return b.getFieldValue(ptr, fieldType)
 	}
 
-	// Handle different nested types
-	return b.getFieldValue(ptr, fieldType)
+	return nil
 }
 
 func FindFirstNumber(s string) (hasNumber bool, position int) {
@@ -382,16 +425,19 @@ func (b *StructBuilder) FromKV(kvs ...KV) *StructBuilder {
 	for _, vv := range kvs {
 		k := vv.Key
 		v := vv.Value
-		hasNumber, _ := FindFirstNumber(k)
-
-		// Skip processing if it contains a number (handled by Set directly)
-		if hasNumber {
-			b.Set(k, v)
-			continue
-		}
 
 		// Try direct field first
-		if _, ok := b.offsets.Get(k); ok {
+		if _, ok := b.getOffset(k); ok {
+			// Special handling for []KV type
+			if kvs, ok := v.([]KV); ok {
+				// Convert KVs to map[string]any
+				kvMap := make(map[string]any)
+				for _, kv := range kvs {
+					kvMap[kv.Key] = kv.Value
+				}
+				b.Set(k, kvMap)
+				continue
+			}
 			b.Set(k, v)
 			continue
 		}
@@ -400,6 +446,35 @@ func (b *StructBuilder) FromKV(kvs ...KV) *StructBuilder {
 		if strings.Contains(k, ".") {
 			parts := strings.Split(k, ".")
 			prefix := parts[0]
+
+			// Check if it's a numeric index
+			if len(parts) > 1 {
+				if _, err := strconv.Atoi(parts[1]); err == nil {
+					// If it's a map value for an index, convert it to proper KV format
+					if mapValue, ok := v.(map[string]any); ok && len(parts) == 2 {
+						for mk, mv := range mapValue {
+							indexedKey := fmt.Sprintf("%s.%s.%s", prefix, parts[1], mk)
+							b.Set(indexedKey, mv)
+						}
+						continue
+					}
+					// Special handling for []KV type
+					if kvs, ok := v.([]KV); ok && len(parts) == 2 {
+						// Convert KVs to map[string]any
+						kvMap := make(map[string]any)
+						for _, kv := range kvs {
+							kvMap[kv.Key] = kv.Value
+						}
+						for mk, mv := range kvMap {
+							indexedKey := fmt.Sprintf("%s.%s.%s", prefix, parts[1], mk)
+							b.Set(indexedKey, mv)
+						}
+						continue
+					}
+					b.Set(k, v)
+					continue
+				}
+			}
 
 			// Collect fields with same prefix
 			if _, ok := prefixMap[prefix]; !ok {
@@ -438,14 +513,18 @@ func (b *StructBuilder) FromMap(data map[string]any) *StructBuilder {
 	prefixMap := make(map[string]map[string]any)
 
 	for k, v := range data {
-		hasNumber, _ := FindFirstNumber(k)
-		if hasNumber {
-			b.Set(k, v)
-			continue
-		}
-
 		// Try direct field first
-		if _, ok := b.offsets.Get(k); ok {
+		if _, ok := b.getOffset(k); ok {
+			// Special handling for []KV type
+			if kvs, ok := v.([]KV); ok {
+				// Convert KVs to map[string]any
+				kvMap := make(map[string]any)
+				for _, kv := range kvs {
+					kvMap[kv.Key] = kv.Value
+				}
+				b.Set(k, kvMap)
+				continue
+			}
 			b.Set(k, v)
 			continue
 		}
@@ -454,6 +533,35 @@ func (b *StructBuilder) FromMap(data map[string]any) *StructBuilder {
 		if strings.Contains(k, ".") {
 			parts := strings.Split(k, ".")
 			prefix := parts[0]
+
+			// Check if it's a numeric index
+			if len(parts) > 1 {
+				if _, err := strconv.Atoi(parts[1]); err == nil {
+					// If it's a map value for an index, convert it to proper KV format
+					if mapValue, ok := v.(map[string]any); ok && len(parts) == 2 {
+						for mk, mv := range mapValue {
+							indexedKey := fmt.Sprintf("%s.%s.%s", prefix, parts[1], mk)
+							b.Set(indexedKey, mv)
+						}
+						continue
+					}
+					// Special handling for []KV type
+					if kvs, ok := v.([]KV); ok && len(parts) == 2 {
+						// Convert KVs to map[string]any
+						kvMap := make(map[string]any)
+						for _, kv := range kvs {
+							kvMap[kv.Key] = kv.Value
+						}
+						for mk, mv := range kvMap {
+							indexedKey := fmt.Sprintf("%s.%s.%s", prefix, parts[1], mk)
+							b.Set(indexedKey, mv)
+						}
+						continue
+					}
+					b.Set(k, v)
+					continue
+				}
+			}
 
 			// Collect fields with same prefix
 			if _, ok := prefixMap[prefix]; !ok {
@@ -493,14 +601,13 @@ func (b *StructBuilder) ToMap() map[string]any {
 	result := *resultPtr
 	clear(result)
 
-	b.offsets.Range(func(fieldName string, offset uintptr) bool {
-		fieldType, _ := b.fieldTypes.Get(fieldName)
-		ptr := unsafe.Pointer(uintptr((*emptyInterface)(unsafe.Pointer(&b.ptr)).word) + offset)
+	b.fields.each(func(fieldName string, info fieldInfo) {
+		ptr := unsafe.Pointer(uintptr((*emptyInterface)(unsafe.Pointer(&b.ptr)).word) + info.offset)
 		if ptr == nil {
-			return true
+			return
 		}
 
-		switch fieldType.Kind() {
+		switch info.typ.Kind() {
 		case reflect.String:
 			result[fieldName] = *(*string)(ptr)
 		case reflect.Int:
@@ -512,28 +619,27 @@ func (b *StructBuilder) ToMap() map[string]any {
 		case reflect.Ptr:
 			ptrVal := *(*unsafe.Pointer)(ptr)
 			if ptrVal != nil {
-				elemVal := reflect.NewAt(fieldType.Elem(), ptrVal).Elem()
+				elemVal := reflect.NewAt(info.typ.Elem(), ptrVal).Elem()
 				result[fieldName] = elemVal.Interface()
 			}
 		case reflect.Map:
-			mapVal := reflect.NewAt(fieldType, ptr).Elem()
+			mapVal := reflect.NewAt(info.typ, ptr).Elem()
 			if !mapVal.IsNil() {
 				result[fieldName] = mapVal.Interface()
 			}
 		case reflect.Slice:
-			sliceVal := reflect.NewAt(fieldType, ptr).Elem()
+			sliceVal := reflect.NewAt(info.typ, ptr).Elem()
 			if !sliceVal.IsNil() {
 				result[fieldName] = sliceVal.Interface()
 			}
 		case reflect.Struct:
-			if fieldType == reflect.TypeOf(time.Time{}) {
+			if info.typ == reflect.TypeOf(time.Time{}) {
 				result[fieldName] = *(*time.Time)(ptr)
 			} else {
-				structVal := reflect.NewAt(fieldType, ptr).Elem()
+				structVal := reflect.NewAt(info.typ, ptr).Elem()
 				result[fieldName] = structVal.Interface()
 			}
 		}
-		return true
 	})
 
 	return result
@@ -575,10 +681,10 @@ func (b *StructBuilder) Clone() any {
 
 // Each iterates over struct fields with a callback
 func (b *StructBuilder) Each(fn func(name string, value any)) *StructBuilder {
-	for _, fieldName := range b.fieldOrder {
+	b.fields.each(func(fieldName string, _ fieldInfo) {
 		value := b.Get(fieldName)
 		fn(fieldName, value)
-	}
+	})
 	return b
 }
 
@@ -589,9 +695,10 @@ func (b *StructBuilder) Filter(predicate func(name string, value any) bool) map[
 	result := *resultPtr
 	clear(result)
 
-	b.Each(func(name string, value any) {
-		if predicate(name, value) {
-			result[name] = value
+	b.fields.each(func(fieldName string, _ fieldInfo) {
+		value := b.Get(fieldName)
+		if predicate(fieldName, value) {
+			result[fieldName] = value
 		}
 	})
 
@@ -599,19 +706,22 @@ func (b *StructBuilder) Filter(predicate func(name string, value any) bool) map[
 }
 
 func (b *StructBuilder) init(t reflect.Type) {
+	fields := newFieldInfoMap(t.NumField())
 	for i := 0; i < t.NumField(); i++ {
 		field := t.Field(i)
 		name := ToSnakeCase(field.Name)
-		b.offsets.Set(name, field.Offset)
-		b.fieldTypes.Set(name, field.Type)
-		b.fieldOrder = append(b.fieldOrder, name)
+		fields.set(name, fieldInfo{
+			offset: field.Offset,
+			typ:    field.Type,
+		})
 	}
+	b.fields = fields
 }
 
 // GetString gets a string field value by name with zero allocations
 func (b *StructBuilder) GetString(fieldPath string) string {
-	if offset, ok := b.offsets.Get(fieldPath); ok {
-		fieldType, _ := b.fieldTypes.Get(fieldPath)
+	if offset, ok := b.getOffset(fieldPath); ok {
+		fieldType, _ := b.getFieldType(fieldPath)
 		if fieldType.Kind() == reflect.String {
 			ptr := unsafe.Pointer(uintptr((*emptyInterface)(unsafe.Pointer(&b.ptr)).word) + offset)
 			return *(*string)(ptr)
@@ -622,8 +732,8 @@ func (b *StructBuilder) GetString(fieldPath string) string {
 
 // GetInt gets an int field value by name with zero allocations
 func (b *StructBuilder) GetInt(fieldPath string) int {
-	if offset, ok := b.offsets.Get(fieldPath); ok {
-		fieldType, _ := b.fieldTypes.Get(fieldPath)
+	if offset, ok := b.getOffset(fieldPath); ok {
+		fieldType, _ := b.getFieldType(fieldPath)
 		if fieldType.Kind() == reflect.Int {
 			ptr := unsafe.Pointer(uintptr((*emptyInterface)(unsafe.Pointer(&b.ptr)).word) + offset)
 			return *(*int)(ptr)
@@ -634,8 +744,8 @@ func (b *StructBuilder) GetInt(fieldPath string) int {
 
 // GetBool gets a bool field value by name with zero allocations
 func (b *StructBuilder) GetBool(fieldPath string) bool {
-	if offset, ok := b.offsets.Get(fieldPath); ok {
-		fieldType, _ := b.fieldTypes.Get(fieldPath)
+	if offset, ok := b.getOffset(fieldPath); ok {
+		fieldType, _ := b.getFieldType(fieldPath)
 		if fieldType.Kind() == reflect.Bool {
 			ptr := unsafe.Pointer(uintptr((*emptyInterface)(unsafe.Pointer(&b.ptr)).word) + offset)
 			return *(*bool)(ptr)
@@ -646,8 +756,8 @@ func (b *StructBuilder) GetBool(fieldPath string) bool {
 
 // GetFloat64 gets a float64 field value by name with zero allocations
 func (b *StructBuilder) GetFloat64(fieldPath string) float64 {
-	if offset, ok := b.offsets.Get(fieldPath); ok {
-		fieldType, _ := b.fieldTypes.Get(fieldPath)
+	if offset, ok := b.getOffset(fieldPath); ok {
+		fieldType, _ := b.getFieldType(fieldPath)
 		if fieldType.Kind() == reflect.Float64 {
 			ptr := unsafe.Pointer(uintptr((*emptyInterface)(unsafe.Pointer(&b.ptr)).word) + offset)
 			return *(*float64)(ptr)
@@ -658,8 +768,8 @@ func (b *StructBuilder) GetFloat64(fieldPath string) float64 {
 
 // SetString sets a string field value by name with zero allocations
 func (b *StructBuilder) SetString(fieldPath string, value string) *StructBuilder {
-	if offset, ok := b.offsets.Get(fieldPath); ok {
-		fieldType, _ := b.fieldTypes.Get(fieldPath)
+	if offset, ok := b.getOffset(fieldPath); ok {
+		fieldType, _ := b.getFieldType(fieldPath)
 		if fieldType.Kind() == reflect.String {
 			ptr := unsafe.Pointer(uintptr((*emptyInterface)(unsafe.Pointer(&b.ptr)).word) + offset)
 			*(*string)(ptr) = value
@@ -671,8 +781,8 @@ func (b *StructBuilder) SetString(fieldPath string, value string) *StructBuilder
 
 // SetInt sets an int field value by name with zero allocations
 func (b *StructBuilder) SetInt(fieldPath string, value int) *StructBuilder {
-	if offset, ok := b.offsets.Get(fieldPath); ok {
-		fieldType, _ := b.fieldTypes.Get(fieldPath)
+	if offset, ok := b.getOffset(fieldPath); ok {
+		fieldType, _ := b.getFieldType(fieldPath)
 		if fieldType.Kind() == reflect.Int {
 			ptr := unsafe.Pointer(uintptr((*emptyInterface)(unsafe.Pointer(&b.ptr)).word) + offset)
 			*(*int)(ptr) = value
@@ -684,8 +794,8 @@ func (b *StructBuilder) SetInt(fieldPath string, value int) *StructBuilder {
 
 // SetBool sets a bool field value by name with zero allocations
 func (b *StructBuilder) SetBool(fieldPath string, value bool) *StructBuilder {
-	if offset, ok := b.offsets.Get(fieldPath); ok {
-		fieldType, _ := b.fieldTypes.Get(fieldPath)
+	if offset, ok := b.getOffset(fieldPath); ok {
+		fieldType, _ := b.getFieldType(fieldPath)
 		if fieldType.Kind() == reflect.Bool {
 			ptr := unsafe.Pointer(uintptr((*emptyInterface)(unsafe.Pointer(&b.ptr)).word) + offset)
 			*(*bool)(ptr) = value
@@ -697,11 +807,24 @@ func (b *StructBuilder) SetBool(fieldPath string, value bool) *StructBuilder {
 
 // SetFloat64 sets a float64 field value by name with zero allocations
 func (b *StructBuilder) SetFloat64(fieldPath string, value float64) *StructBuilder {
-	if offset, ok := b.offsets.Get(fieldPath); ok {
-		fieldType, _ := b.fieldTypes.Get(fieldPath)
+	if offset, ok := b.getOffset(fieldPath); ok {
+		fieldType, _ := b.getFieldType(fieldPath)
 		if fieldType.Kind() == reflect.Float64 {
 			ptr := unsafe.Pointer(uintptr((*emptyInterface)(unsafe.Pointer(&b.ptr)).word) + offset)
 			*(*float64)(ptr) = value
+			return b
+		}
+	}
+	return b
+}
+
+// SetFloat32 sets a float32 field value by name with zero allocations
+func (b *StructBuilder) SetFloat32(fieldPath string, value float32) *StructBuilder {
+	if offset, ok := b.getOffset(fieldPath); ok {
+		fieldType, _ := b.getFieldType(fieldPath)
+		if fieldType.Kind() == reflect.Float32 {
+			ptr := unsafe.Pointer(uintptr((*emptyInterface)(unsafe.Pointer(&b.ptr)).word) + offset)
+			*(*float32)(ptr) = value
 			return b
 		}
 	}
@@ -813,4 +936,33 @@ func (b *StructBuilder) Fill(data any) *StructBuilder {
 		}
 	}
 	return b
+}
+
+func (b *StructBuilder) getOffset(name string) (uintptr, bool) {
+	info, ok := b.fields.get(name)
+	if ok {
+		return info.offset, true
+	}
+	return 0, false
+}
+
+func (b *StructBuilder) getFieldType(name string) (reflect.Type, bool) {
+	info, ok := b.fields.get(name)
+	if ok {
+		return info.typ, true
+	}
+	return nil, false
+}
+
+// Add methods to fieldInfoMap for iteration
+func (m *fieldInfoMap) each(fn func(name string, info fieldInfo)) {
+	if m.isFixed {
+		for i := 0; i < m.fixedSize; i++ {
+			fn(m.fixedKeys[i], m.fixedInfos[i])
+		}
+	} else {
+		for k, v := range m.mapInfo {
+			fn(k, v)
+		}
+	}
 }

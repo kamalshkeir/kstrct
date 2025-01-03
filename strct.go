@@ -437,6 +437,9 @@ loop:
 		} else if field.Kind() == reflect.Slice || (field.Kind() == reflect.Pointer && field.Elem().Kind() == reflect.Slice) {
 			if field.Kind() == reflect.Pointer {
 				field = field.Elem()
+				if !field.IsValid() {
+					return fmt.Errorf("field nested slice not valid %v", field.Kind())
+				}
 			}
 			err = SetReflectFieldValue(field, nestedKVs)
 			if err != nil {
@@ -474,7 +477,7 @@ func Fill(structOrChanPtr any, fields_values []KV, nested ...bool) (err error) {
 		return nil
 	}
 
-	// For non-channel types, use the builder
+	// For non-channel types, use builder with handleNestedField
 	builder := NewBuilder(structOrChanPtr)
 	builder.FromKV(fields_values...)
 	return builder.Error()

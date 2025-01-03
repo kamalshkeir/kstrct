@@ -75,6 +75,10 @@ func SetUIntField(structPtr any, offset uintptr, value uint) {
 	intPtr := (*uint)(GetFieldPointer(structPtr, offset))
 	*intPtr = value
 }
+func SetUInt64Field(structPtr any, offset uintptr, value uint64) {
+	intPtr := (*uint64)(GetFieldPointer(structPtr, offset))
+	*intPtr = value
+}
 func SetUInt8Field(structPtr any, offset uintptr, value uint8) {
 	intPtr := (*uint8)(GetFieldPointer(structPtr, offset))
 	*intPtr = value

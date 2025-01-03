@@ -249,7 +249,6 @@ package kstrct
 // 			"bool":    true,
 // 			"time":    time.Now(),
 // 		})
-
 // 		assert.Equal(t, "test2", s.String)
 // 		assert.Equal(t, 43, s.Int)
 // 		assert.Equal(t, 3.14, s.Float64)
@@ -1136,14 +1135,14 @@ package kstrct
 // 	b.ResetTimer()
 // 	for i := 0; i < b.N; i++ {
 // 		// Set simple field
-// 		SetReflectFieldValueNew(nameField, "Dr. Jones")
+// 		SetRFValue(nameField, "Dr. Jones")
 
 // 		// Set all week timeslots
-// 		SetReflectFieldValueNew(mondayField, "9:00,10:00,11:00")
-// 		SetReflectFieldValueNew(tuesdayField, "9:00,10:00,11:00")
-// 		SetReflectFieldValueNew(wednesdayField, "9:00,10:00,11:00")
-// 		SetReflectFieldValueNew(thursdayField, "9:00,10:00,11:00")
-// 		SetReflectFieldValueNew(fridayField, "9:00,10:00,11:00")
+// 		SetRFValue(mondayField, "9:00,10:00,11:00")
+// 		SetRFValue(tuesdayField, "9:00,10:00,11:00")
+// 		SetRFValue(wednesdayField, "9:00,10:00,11:00")
+// 		SetRFValue(thursdayField, "9:00,10:00,11:00")
+// 		SetRFValue(fridayField, "9:00,10:00,11:00")
 // 	}
 // }
 
@@ -1178,4 +1177,163 @@ package kstrct
 // 		builder.Set("week_timeslots.thursday", "9:00,10:00,11:00")
 // 		builder.Set("week_timeslots.friday", "9:00,10:00,11:00")
 // 	}
+// }
+
+// func TestNestedFieldHandling(t *testing.T) {
+// 	type Address struct {
+// 		Street string
+// 		City   string
+// 	}
+// 	type User struct {
+// 		Name    string
+// 		Address *Address
+// 		Tags    map[string]string
+// 	}
+
+// 	tests := []struct {
+// 		name   string
+// 		input  map[string]any
+// 		expect User
+// 	}{
+// 		{
+// 			name: "nested pointer and map",
+// 			input: map[string]any{
+// 				"name":           "John",
+// 				"address.street": "123 Main St",
+// 				"address.city":   "Boston",
+// 				"tags.color":     "blue",
+// 				"tags.size":      "large",
+// 			},
+// 			expect: User{
+// 				Name: "John",
+// 				Address: &Address{
+// 					Street: "123 Main St",
+// 					City:   "Boston",
+// 				},
+// 				Tags: map[string]string{
+// 					"color": "blue",
+// 					"size":  "large",
+// 				},
+// 			},
+// 		},
+// 	}
+
+// 	for _, tt := range tests {
+// 		t.Run(tt.name, func(t *testing.T) {
+// 			// Test FromMap
+// 			u1 := User{}
+// 			t.Logf("Before FromMap: %+v", u1)
+// 			err := NewBuilder(&u1).FromMap(tt.input).Error()
+// 			if err != nil {
+// 				t.Errorf("FromMap error: %v", err)
+// 			}
+// 			t.Logf("After FromMap: %+v", u1)
+// 			if u1.Address != nil {
+// 				t.Logf("Address after FromMap: {Street:%s City:%s}", u1.Address.Street, u1.Address.City)
+// 			}
+// 			if !reflect.DeepEqual(u1, tt.expect) {
+// 				t.Errorf("FromMap got = %+v, want %+v", u1, tt.expect)
+// 			}
+
+// 			// Test FromKV
+// 			u2 := User{}
+// 			t.Logf("Before FromKV: %+v", u2)
+// 			var kvs []KV
+// 			for k, v := range tt.input {
+// 				kvs = append(kvs, KV{k, v})
+// 			}
+// 			err = NewBuilder(&u2).FromKV(kvs...).Error()
+// 			if err != nil {
+// 				t.Errorf("FromKV error: %v", err)
+// 			}
+// 			t.Logf("After FromKV: %+v", u2)
+// 			if u2.Address != nil {
+// 				t.Logf("Address after FromKV: {Street:%s City:%s}", u2.Address.Street, u2.Address.City)
+// 			}
+// 			if !reflect.DeepEqual(u2, tt.expect) {
+// 				t.Errorf("FromKV got = %+v, want %+v", u2, tt.expect)
+// 			}
+
+// 			// Test Fill
+// 			u3 := &User{}
+// 			t.Logf("Before Fill: %+v", u3)
+// 			err = Fill(u3, kvs)
+// 			if err != nil {
+// 				t.Errorf("Fill error: %v", err)
+// 			}
+// 			t.Logf("After Fill: %+v", *u3)
+// 			if u3.Address != nil {
+// 				t.Logf("Address after Fill: {Street:%s City:%s}", u3.Address.Street, u3.Address.City)
+// 			}
+// 			if !reflect.DeepEqual(*u3, tt.expect) {
+// 				t.Errorf("Fill got = %+v, want %+v", *u3, tt.expect)
+// 			}
+// 		})
+// 	}
+// }
+
+// func BenchmarkNewBuilder(b *testing.B) {
+// 	type TestStruct struct {
+// 		String  string
+// 		Int     int
+// 		Bool    bool
+// 		Float   float64
+// 		Slice   []string
+// 		Map     map[string]interface{}
+// 		Pointer *string
+// 		Nested  struct {
+// 			Field string
+// 		}
+// 	}
+
+// 	var s TestStruct
+// 	b.ResetTimer()
+// 	for i := 0; i < b.N; i++ {
+// 		NewBuilder(&s)
+// 	}
+// }
+
+// func BenchmarkKMapOperations(b *testing.B) {
+// 	m := kmap.New[string, fieldInfo]()
+// 	info := fieldInfo{
+// 		offset: 123,
+// 		typ:    reflect.TypeOf(""),
+// 	}
+
+// 	// Benchmark Set operation
+// 	b.Run("Set", func(b *testing.B) {
+// 		b.ReportAllocs()
+// 		for i := 0; i < b.N; i++ {
+// 			key := fmt.Sprintf("field_%d", i)
+// 			m.Set(key, info)
+// 		}
+// 	})
+
+// 	// Benchmark Get operation
+// 	b.Run("Get", func(b *testing.B) {
+// 		b.ReportAllocs()
+// 		for i := 0; i < b.N; i++ {
+// 			key := fmt.Sprintf("field_%d", i%100) // Reuse keys to ensure they exist
+// 			_, _ = m.Get(key)
+// 		}
+// 	})
+
+// 	// Benchmark Range operation
+// 	b.Run("Range", func(b *testing.B) {
+// 		b.ReportAllocs()
+// 		for i := 0; i < b.N; i++ {
+// 			m.Range(func(k string, v fieldInfo) bool {
+// 				return true
+// 			})
+// 		}
+// 	})
+
+// 	// Benchmark Delete operation
+// 	b.Run("Delete", func(b *testing.B) {
+// 		b.ReportAllocs()
+// 		for i := 0; i < b.N; i++ {
+// 			key := fmt.Sprintf("field_%d", i%100)
+// 			m.Delete(key)
+// 		}
+// 	})
 // }

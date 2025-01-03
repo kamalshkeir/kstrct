@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -16,7 +17,39 @@ var (
 			return &s
 		},
 	}
+	// Pool for small slices to reduce allocations
+	smallSlicePool = sync.Pool{
+		New: func() any {
+			// Pre-allocate a slice that can hold common cases (e.g. "a,b,c")
+			s := reflect.MakeSlice(reflect.SliceOf(reflect.TypeOf("")), 0, 8)
+			return &s
+		},
+	}
 )
+
+// getSmallSlice gets a pre-allocated slice from the pool if the type matches
+func getSmallSlice(typ reflect.Type, size int) (reflect.Value, bool) {
+	if size <= 8 { // Only use pool for small slices
+		if p := smallSlicePool.Get().(*reflect.Value); p != nil {
+			if (*p).Type().Elem() == typ {
+				newSlice := *p
+				newSlice = newSlice.Slice(0, 0)
+				if newSlice.Cap() >= size {
+					return newSlice, true
+				}
+			}
+			smallSlicePool.Put(p)
+		}
+	}
+	return reflect.Value{}, false
+}
+
+// putSmallSlice returns a slice to the pool if it meets the criteria
+func putSmallSlice(v reflect.Value) {
+	if v.Cap() <= 8 && v.Len() <= 8 {
+		smallSlicePool.Put(&v)
+	}
+}
 
 func InitSetterSlice() {
 	// Register Slice handler
@@ -29,12 +62,18 @@ func InitSetterSlice() {
 				return nil
 			}
 
-			// Pre-allocate slice with exact capacity needed
-			newSlice := reflect.MakeSlice(fld.Type(), value.Len(), value.Len())
+			// Try to get a pre-allocated slice from the pool
+			newSlice, ok := getSmallSlice(fld.Type().Elem(), value.Len())
+			if !ok {
+				newSlice = reflect.MakeSlice(fld.Type(), 0, value.Len())
+			}
+
 			elemType := fld.Type().Elem()
 			for i := 0; i < value.Len(); i++ {
-				elem := newSlice.Index(i)
 				sourceElem := value.Index(i).Interface()
+				// Grow slice as needed
+				newSlice = reflect.Append(newSlice, reflect.Zero(elemType))
+				elem := newSlice.Index(i)
 
 				// Use direct memory access for basic types
 				switch elemType.Kind() {
@@ -66,6 +105,7 @@ func InitSetterSlice() {
 					}
 				default:
 					if err := SetRFValue(elem, sourceElem); err != nil {
+						putSmallSlice(newSlice)
 						return fmt.Errorf("error converting slice element %d: %v", i, err)
 					}
 				}
@@ -76,80 +116,93 @@ func InitSetterSlice() {
 
 		// Handle comma-separated string values for slices
 		if str, ok := valueI.(string); ok {
-			// Get positions slice from pool
-			posPtr := slicePool.Get().(*[]int)
-			positions := *posPtr
-			positions = positions[:0]
-			defer func() {
-				*posPtr = positions[:0]
-				slicePool.Put(posPtr)
-			}()
+			elemType := fld.Type().Elem()
 
-			// Count non-empty elements and track positions in one pass
-			count := 0
-			start := 0
+			// Special handling for slice of maps or structs
+			switch elemType.Kind() {
+			case reflect.Map:
+				if err := handleMapSliceFromString(fld, str); err != nil {
+					return err
+				}
+				return nil
+			case reflect.Struct:
+				if err := handleStructSliceFromString(fld, str); err != nil {
+					return err
+				}
+				return nil
+			}
+
+			// Fast path for empty string
+			if str == "" {
+				fld.Set(reflect.MakeSlice(fld.Type(), 0, 0))
+				return nil
+			}
+
+			// Count commas to pre-allocate slice with exact size
+			count := 1
 			for i := 0; i < len(str); i++ {
-				if str[i] == ',' || i == len(str)-1 {
-					end := i
-					if i == len(str)-1 && str[i] != ',' {
-						end = i + 1
-					}
-					// Check if segment is non-empty without allocating
-					segStart := start
-					segEnd := end
-					for segStart < segEnd && str[segStart] == ' ' {
-						segStart++
-					}
-					for segEnd > segStart && str[segEnd-1] == ' ' {
-						segEnd--
-					}
-					if segEnd > segStart {
-						positions = append(positions, segStart, segEnd)
-						count++
-					}
-					start = i + 1
+				if str[i] == ',' {
+					count++
 				}
 			}
 
 			// Pre-allocate result slice with exact size
 			newSlice := reflect.MakeSlice(fld.Type(), count, count)
-			elemType := fld.Type().Elem()
-			for i := 0; i < count; i++ {
-				elem := newSlice.Index(i)
-				start := positions[i*2]
-				end := positions[i*2+1]
-				part := str[start:end]
 
-				// Use direct memory access for basic types
-				switch elemType.Kind() {
-				case reflect.String:
-					elem.SetString(part)
-				case reflect.Int:
-					if v, err := strconv.Atoi(part); err == nil {
-						elem.SetInt(int64(v))
+			// Parse elements without allocating substrings
+			idx := 0
+			start := 0
+			for i := 0; i <= len(str); i++ {
+				if i == len(str) || str[i] == ',' {
+					// Trim spaces without allocation
+					end := i
+					for start < end && str[start] == ' ' {
+						start++
 					}
-				case reflect.Bool:
-					if v, err := strconv.ParseBool(part); err == nil {
-						elem.SetBool(v)
+					for end > start && str[end-1] == ' ' {
+						end--
 					}
-				case reflect.Float64:
-					if v, err := strconv.ParseFloat(part, 64); err == nil {
-						elem.SetFloat(v)
-					}
-				default:
-					if elemType == reflect.TypeOf(time.Time{}) {
-						if t, err := parseTimeString(part); err == nil {
-							elem.Set(reflect.ValueOf(t))
-						} else {
-							return fmt.Errorf("error converting slice element from string: %v", err)
+
+					if start < end {
+						elem := newSlice.Index(idx)
+						part := str[start:end]
+
+						// Use direct memory access for basic types
+						switch elemType.Kind() {
+						case reflect.String:
+							elem.SetString(part)
+						case reflect.Int:
+							if v, err := strconv.Atoi(part); err == nil {
+								elem.SetInt(int64(v))
+							}
+						case reflect.Bool:
+							if v, err := strconv.ParseBool(part); err == nil {
+								elem.SetBool(v)
+							}
+						case reflect.Float64:
+							if v, err := strconv.ParseFloat(part, 64); err == nil {
+								elem.SetFloat(v)
+							}
+						default:
+							if elemType == reflect.TypeOf(time.Time{}) {
+								if t, err := parseTimeString(part); err == nil {
+									elem.Set(reflect.ValueOf(t))
+								}
+							} else {
+								SetRFValue(elem, part)
+							}
 						}
-					} else {
-						if err := SetRFValue(elem, part); err != nil {
-							return fmt.Errorf("error converting slice element from string: %v", err)
-						}
+						idx++
 					}
+					start = i + 1
 				}
 			}
+
+			// If we found fewer non-empty elements than commas, resize the slice
+			if idx < count {
+				newSlice = newSlice.Slice(0, idx)
+			}
+
 			fld.Set(newSlice)
 			return nil
 		}
@@ -277,4 +330,316 @@ func InitSetterSlice() {
 
 		return fmt.Errorf("cannot assign value of type %T to slice of type %s", valueI, fld.Type())
 	}, reflect.Slice)
+}
+
+// Helper functions at the end of InitSetterSlice
+func handleMapSliceFromString(fld reflect.Value, str string) error {
+	// Get positions slice from pool
+	posPtr := slicePool.Get().(*[]int)
+	positions := *posPtr
+	positions = positions[:0]
+	defer func() {
+		*posPtr = positions[:0]
+		slicePool.Put(posPtr)
+	}()
+
+	// First, split the input into individual maps
+	var maps []string
+	current := ""
+	inQuote := false
+	quoteChar := byte(0)
+	for i := 0; i < len(str); i++ {
+		if (str[i] == '"' || str[i] == '\'') && (i == 0 || str[i-1] != '\\') {
+			if !inQuote {
+				inQuote = true
+				quoteChar = str[i]
+			} else if str[i] == quoteChar {
+				inQuote = false
+			}
+		}
+		if !inQuote && str[i] == ';' {
+			if current != "" {
+				maps = append(maps, current)
+				current = ""
+			}
+		} else {
+			current += string(str[i])
+		}
+	}
+	if current != "" {
+		maps = append(maps, current)
+	}
+
+	// If no explicit map separation, treat the whole string as one map
+	if len(maps) == 0 {
+		if strings.TrimSpace(str) == "" {
+			return nil // Handle empty string case
+		}
+		maps = []string{str}
+	}
+
+	// Create slice with the right size
+	newSlice := reflect.MakeSlice(fld.Type(), len(maps), len(maps))
+	elemType := fld.Type().Elem()
+
+	// Process each map
+	for i, mapStr := range maps {
+		elem := newSlice.Index(i)
+		mapElem := reflect.MakeMap(elemType)
+
+		// Split into key-value pairs
+		pairs := strings.Split(mapStr, ",")
+		hasValidPair := false
+		for _, pair := range pairs {
+			pair = strings.TrimSpace(pair)
+			if pair == "" {
+				continue
+			}
+
+			// Count colons to detect invalid format
+			colonCount := 0
+			for _, ch := range pair {
+				if ch == ':' {
+					colonCount++
+				}
+			}
+			if colonCount != 1 {
+				return fmt.Errorf("invalid key-value pair format (should contain exactly one colon): %s", pair)
+			}
+
+			// Split into key and value
+			kv := strings.SplitN(pair, ":", 2)
+			if len(kv) != 2 {
+				return fmt.Errorf("invalid key-value pair format: %s", pair)
+			}
+
+			key := strings.TrimSpace(kv[0])
+			if key == "" {
+				return fmt.Errorf("empty key in pair: %s", pair)
+			}
+
+			value := strings.TrimSpace(kv[1])
+			if value == "" {
+				return fmt.Errorf("empty value in pair: %s", pair)
+			}
+			hasValidPair = true
+
+			// Remove surrounding quotes if present
+			if len(value) >= 2 {
+				if (value[0] == '"' && value[len(value)-1] == '"') ||
+					(value[0] == '\'' && value[len(value)-1] == '\'') {
+					value = value[1 : len(value)-1]
+				}
+			}
+
+			// Create key and value reflect.Values
+			keyValue := reflect.ValueOf(key)
+			if elemType.Key().Kind() != reflect.String {
+				// Handle non-string key types
+				switch elemType.Key().Kind() {
+				case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+					if v, err := strconv.ParseUint(key, 10, 64); err == nil {
+						// Check for uint8 overflow
+						if elemType.Key().Kind() == reflect.Uint8 && v > 255 {
+							return fmt.Errorf("uint8 overflow for key: %s", key)
+						}
+						keyValue = reflect.ValueOf(v).Convert(elemType.Key())
+					} else {
+						return fmt.Errorf("invalid uint key: %s", key)
+					}
+				case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+					if v, err := strconv.ParseInt(key, 10, 64); err == nil {
+						keyValue = reflect.ValueOf(v).Convert(elemType.Key())
+					} else {
+						return fmt.Errorf("invalid int key: %s", key)
+					}
+				case reflect.Float32, reflect.Float64:
+					if v, err := strconv.ParseFloat(key, 64); err == nil {
+						keyValue = reflect.ValueOf(v).Convert(elemType.Key())
+					} else {
+						return fmt.Errorf("invalid float key: %s", key)
+					}
+				case reflect.Struct:
+					if elemType.Key() == reflect.TypeOf(time.Time{}) {
+						if t, err := time.Parse("2006-01-02", key); err == nil {
+							keyValue = reflect.ValueOf(t)
+						} else {
+							return fmt.Errorf("invalid time key format: %s", key)
+						}
+					} else {
+						return fmt.Errorf("unsupported struct key type: %v", elemType.Key())
+					}
+				default:
+					return fmt.Errorf("unsupported key type: %v", elemType.Key())
+				}
+			}
+
+			var finalValue reflect.Value
+
+			// Handle different value types based on the string value
+			if elemType.Elem().Kind() == reflect.Interface {
+				// Try to infer the type for interface{}
+				if strings.EqualFold(value, "true") || strings.EqualFold(value, "false") {
+					if v, err := strconv.ParseBool(value); err == nil {
+						finalValue = reflect.ValueOf(v)
+					}
+				} else if strings.Contains(value, ".") {
+					// Try float first for decimal numbers
+					if v, err := strconv.ParseFloat(value, 64); err == nil {
+						// Always use float64 for decimal numbers in interface{}
+						finalValue = reflect.ValueOf(float64(v))
+					}
+				} else if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+					// Use int for whole numbers
+					finalValue = reflect.ValueOf(int(v))
+				} else {
+					finalValue = reflect.ValueOf(value)
+				}
+			} else {
+				// For specific types
+				switch elemType.Elem().Kind() {
+				case reflect.String:
+					finalValue = reflect.ValueOf(value)
+				case reflect.Int:
+					if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+						finalValue = reflect.ValueOf(int(v))
+					}
+				case reflect.Int64:
+					if v, err := strconv.ParseInt(value, 10, 64); err == nil {
+						finalValue = reflect.ValueOf(v)
+					}
+				case reflect.Float64:
+					if v, err := strconv.ParseFloat(value, 64); err == nil {
+						finalValue = reflect.ValueOf(v)
+					}
+				case reflect.Bool:
+					if v, err := strconv.ParseBool(value); err == nil {
+						finalValue = reflect.ValueOf(v)
+					}
+				default:
+					// Try to convert string to the target type
+					targetType := elemType.Elem()
+					newValue := reflect.New(targetType).Elem()
+					if err := SetRFValue(newValue, value); err == nil {
+						finalValue = newValue
+					} else {
+						finalValue = reflect.ValueOf(value)
+					}
+				}
+			}
+
+			if !finalValue.IsValid() {
+				return fmt.Errorf("invalid value for key %s: %s", key, value)
+			}
+
+			// For interface{}, we don't need to convert
+			if elemType.Elem().Kind() == reflect.Interface {
+				mapElem.SetMapIndex(keyValue, finalValue)
+			} else if finalValue.Type().ConvertibleTo(elemType.Elem()) {
+				mapElem.SetMapIndex(keyValue, finalValue.Convert(elemType.Elem()))
+			} else {
+				return fmt.Errorf("cannot convert value %v to type %v", finalValue.Interface(), elemType.Elem())
+			}
+		}
+
+		if !hasValidPair {
+			return fmt.Errorf("no valid key-value pairs found in input: %s", mapStr)
+		}
+
+		elem.Set(mapElem)
+	}
+
+	fld.Set(newSlice)
+	return nil
+}
+
+func handleStructSliceFromString(fld reflect.Value, str string) error {
+	// Get positions slice from pool
+	posPtr := slicePool.Get().(*[]int)
+	positions := *posPtr
+	positions = positions[:0]
+	defer func() {
+		*posPtr = positions[:0]
+		slicePool.Put(posPtr)
+	}()
+
+	// First, split the input into individual structs
+	var structs []string
+	current := ""
+	inQuote := false
+	quoteChar := byte(0)
+	for i := 0; i < len(str); i++ {
+		if (str[i] == '"' || str[i] == '\'') && (i == 0 || str[i-1] != '\\') {
+			if !inQuote {
+				inQuote = true
+				quoteChar = str[i]
+			} else if str[i] == quoteChar {
+				inQuote = false
+			}
+		}
+		if !inQuote && str[i] == ';' {
+			if current != "" {
+				structs = append(structs, current)
+				current = ""
+			}
+		} else {
+			current += string(str[i])
+		}
+	}
+	if current != "" {
+		structs = append(structs, current)
+	}
+
+	// If no explicit struct separation, treat the whole string as one struct
+	if len(structs) == 0 {
+		structs = []string{str}
+	}
+
+	// Create slice with the right size
+	newSlice := reflect.MakeSlice(fld.Type(), len(structs), len(structs))
+
+	// Process each struct
+	for i, structStr := range structs {
+		elem := newSlice.Index(i)
+		if elem.Kind() == reflect.Ptr {
+			if elem.IsNil() {
+				elem.Set(reflect.New(elem.Type().Elem()))
+			}
+			elem = elem.Elem()
+		}
+
+		// Split into key-value pairs
+		pairs := strings.Split(structStr, ",")
+		for _, pair := range pairs {
+			pair = strings.TrimSpace(pair)
+			if pair == "" {
+				continue
+			}
+
+			// Split into key and value
+			kv := strings.SplitN(pair, ":", 2)
+			if len(kv) != 2 {
+				continue
+			}
+
+			field := strings.TrimSpace(kv[0])
+			value := strings.TrimSpace(kv[1])
+
+			// Remove surrounding quotes if present
+			if len(value) >= 2 {
+				if (value[0] == '"' && value[len(value)-1] == '"') ||
+					(value[0] == '\'' && value[len(value)-1] == '\'') {
+					value = value[1 : len(value)-1]
+				}
+			}
+
+			// Set struct field
+			if err := SetRFValue(elem, KV{Key: field, Value: value}); err != nil {
+				return fmt.Errorf("error setting struct element %d: %v", i, err)
+			}
+		}
+	}
+
+	fld.Set(newSlice)
+	return nil
 }

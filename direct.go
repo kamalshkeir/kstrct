@@ -703,6 +703,126 @@ func (b *StructBuilder) handleDirectSet(fieldPath string, offset uintptr, value 
 			}
 			return true
 		}
+	case reflect.Uint64:
+		switch vv := value.(type) {
+		case uint8:
+			SetUInt64Field(b.ptr, offset, uint64(vv))
+			return true
+		case *uint8:
+			if vv != nil {
+				SetUInt64Field(b.ptr, offset, uint64(*vv))
+			}
+			return true
+		case uint:
+			SetUInt64Field(b.ptr, offset, uint64(vv))
+			return true
+		case *uint:
+			if vv != nil {
+				SetUInt64Field(b.ptr, offset, uint64(*vv))
+			}
+			return true
+		case uint32:
+			SetUInt64Field(b.ptr, offset, uint64(vv))
+			return true
+		case *uint32:
+			if vv != nil {
+				SetUInt64Field(b.ptr, offset, uint64(*vv))
+			}
+			return true
+		case uint16:
+			SetUInt64Field(b.ptr, offset, uint64(vv))
+			return true
+		case *uint16:
+			if vv != nil {
+				SetUInt64Field(b.ptr, offset, uint64(*vv))
+			}
+			return true
+
+		case string:
+			n, err := strconv.Atoi(vv)
+			if err == nil {
+				SetUInt64Field(b.ptr, offset, uint64(n))
+				return true
+			}
+		case *string:
+			if vv != nil {
+				n, err := strconv.Atoi(*vv)
+				if err == nil {
+					SetUInt64Field(b.ptr, offset, uint64(n))
+					return true
+				}
+			}
+		case int:
+			SetUInt64Field(b.ptr, offset, uint64(vv))
+			return true
+		case *int:
+			if vv != nil {
+				SetUInt64Field(b.ptr, offset, uint64(*vv))
+			}
+			return true
+		case []byte:
+			n, err := strconv.Atoi(string(vv))
+			if err == nil {
+				SetUInt64Field(b.ptr, offset, uint64(n))
+				return true
+			}
+		case *[]byte:
+			if vv != nil {
+				n, err := strconv.Atoi(string(*vv))
+				if err == nil {
+					SetUInt64Field(b.ptr, offset, uint64(n))
+					return true
+				}
+			}
+		case int64:
+			SetUInt64Field(b.ptr, offset, uint64(vv))
+			return true
+		case *int64:
+			if vv != nil {
+				SetUInt64Field(b.ptr, offset, uint64(*vv))
+			}
+			return true
+		case int32:
+			SetUInt64Field(b.ptr, offset, uint64(vv))
+			return true
+		case *int32:
+			if vv != nil {
+				SetUInt64Field(b.ptr, offset, uint64(*vv))
+			}
+			return true
+		case float64:
+			SetUInt64Field(b.ptr, offset, uint64(vv))
+			return true
+		case *float64:
+			if vv != nil {
+				SetUInt64Field(b.ptr, offset, uint64(*vv))
+			}
+			return true
+		case uint64:
+			SetUInt64Field(b.ptr, offset, uint64(vv))
+			return true
+		case *uint64:
+			if vv != nil {
+				SetUInt64Field(b.ptr, offset, uint64(*vv))
+			}
+			return true
+		case float32:
+			SetUInt64Field(b.ptr, offset, uint64(vv))
+			return true
+		case *float32:
+			if vv != nil {
+				SetUInt64Field(b.ptr, offset, uint64(*vv))
+			}
+			return true
+		case int16:
+			SetUInt64Field(b.ptr, offset, uint64(vv))
+			return true
+		case *int16:
+			if vv != nil {
+				SetUInt64Field(b.ptr, offset, uint64(*vv))
+			}
+			return true
+		}
 	case reflect.Int32:
 		switch vv := value.(type) {
 		case int32:
@@ -944,7 +1064,51 @@ func (b *StructBuilder) handleDirectSet(fieldPath string, offset uintptr, value 
 			}
 			return true
 		}
-
+	case reflect.Float32:
+		switch vv := value.(type) {
+		case float32:
+			b.SetFloat32(fieldPath, vv)
+			return true
+		case int:
+			b.SetFloat32(fieldPath, float32(vv))
+			return true
+		case string:
+			trfa, err := strconv.Atoi(vv)
+			if err == nil {
+				b.SetFloat32(fieldPath, float32(trfa))
+				return true
+			}
+		case []byte:
+			trfa, err := strconv.Atoi(string(vv))
+			if err == nil {
+				b.SetFloat32(fieldPath, float32(trfa))
+				return true
+			}
+		case int64:
+			b.SetFloat32(fieldPath, float32(vv))
+			return true
+		case uint:
+			b.SetFloat32(fieldPath, float32(vv))
+			return true
+		case uint8:
+			b.SetFloat32(fieldPath, float32(vv))
+			return true
+		case int32:
+			b.SetFloat32(fieldPath, float32(vv))
+			return true
+		case int16:
+			b.SetFloat32(fieldPath, float32(vv))
+			return true
+		case uint64:
+			b.SetFloat32(fieldPath, float32(vv))
+			return true
+		case uint32:
+			b.SetFloat32(fieldPath, float32(vv))
+			return true
+		case uint16:
+			b.SetFloat32(fieldPath, float32(vv))
+			return true
+		}
 	}
 	return false
 }
