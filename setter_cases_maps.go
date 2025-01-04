@@ -57,11 +57,11 @@ func InitSetterMaps() {
 			valueType := mapType.Elem()
 
 			if Debug {
-				fmt.Printf("field type %T %v\n", fld.Interface(), fld.Kind() == reflect.Pointer)
+				fmt.Printf("field type %T\n", fld.Interface())
 			}
 
 			// Parse string into key-value pairs
-			pairs := strings.Split(v, ",")
+			pairs := strings.Split(v, ";;")
 			for _, pair := range pairs {
 				pair = strings.TrimSpace(pair)
 				if pair == "" {
@@ -78,7 +78,6 @@ func InitSetterMaps() {
 				value := strings.TrimSpace(kv[1])
 
 				// Remove surrounding quotes from value if present
-				value = strings.TrimSpace(value) // First trim spaces
 				if len(value) >= 2 {
 					if (value[0] == '"' && value[len(value)-1] == '"') ||
 						(value[0] == '\'' && value[len(value)-1] == '\'') {

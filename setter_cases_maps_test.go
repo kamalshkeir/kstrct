@@ -16,55 +16,55 @@ func TestMapFromString(t *testing.T) {
 		{
 			name:     "map_string_string_basic",
 			target:   &map[string]string{},
-			input:    "name:John,age:25",
+			input:    "name:John;;age:25",
 			expected: map[string]string{"name": "John", "age": "25"},
 		},
 		{
 			name:     "map_string_string_with_quotes",
 			target:   &map[string]string{},
-			input:    `name:"John Doe",description:'Software Engineer'`,
+			input:    `name:"John Doe";;description:'Software Engineer'`,
 			expected: map[string]string{"name": "John Doe", "description": "Software Engineer"},
 		},
 		{
 			name:     "map_uint_string",
 			target:   &map[uint]string{},
-			input:    "1:first,2:second,3:third",
+			input:    "1:first;;2:second;;3:third",
 			expected: map[uint]string{1: "first", 2: "second", 3: "third"},
 		},
 		{
 			name:     "map_uint8_string",
 			target:   &map[uint8]string{},
-			input:    "1:one,2:two,255:max",
+			input:    "1:one;;2:two;;255:max",
 			expected: map[uint8]string{1: "one", 2: "two", 255: "max"},
 		},
 		{
 			name:     "map_string_interface",
 			target:   &map[string]interface{}{},
-			input:    "name:John,age:25,active:true,salary:50000.50",
+			input:    "name:John;;age:25;;active:true;;salary:50000.50",
 			expected: map[string]interface{}{"name": "John", "age": int64(25), "active": true, "salary": 50000.50},
 		},
 		{
 			name:     "map_string_int",
 			target:   &map[string]int{},
-			input:    "one:1,two:2,three:3",
+			input:    "one:1;;two:2;;three:3",
 			expected: map[string]int{"one": 1, "two": 2, "three": 3},
 		},
 		{
 			name:     "map_string_float64",
 			target:   &map[string]float64{},
-			input:    "pi:3.14,e:2.718",
+			input:    "pi:3.14;;e:2.718",
 			expected: map[string]float64{"pi": 3.14, "e": 2.718},
 		},
 		{
 			name:     "map_string_bool",
 			target:   &map[string]bool{},
-			input:    "valid:true,active:false",
+			input:    "valid:true;;active:false",
 			expected: map[string]bool{"valid": true, "active": false},
 		},
 		{
 			name:   "map_time_string",
 			target: &map[time.Time]string{},
-			input:  "2023-01-01:new year,2023-12-25:christmas",
+			input:  "2023-01-01:new year;;2023-12-25:christmas",
 			expected: map[time.Time]string{
 				mustParseTime("2023-01-01"): "new year",
 				mustParseTime("2023-12-25"): "christmas",
@@ -73,7 +73,7 @@ func TestMapFromString(t *testing.T) {
 		{
 			name:   "map_uint_interface",
 			target: &map[uint]interface{}{},
-			input:  "1:first,2:true,3:123,4:45.67",
+			input:  "1:first;;2:true;;3:123;;4:45.67",
 			expected: map[uint]interface{}{
 				1: "first",
 				2: true,

@@ -13,15 +13,15 @@ import (
 func InitSetterStruct() {
 	// Register Time handler
 	NewSetterCase(func(fld reflect.Value, value reflect.Value, valueI any) error {
-		// Only handle time.Time fields
-		if fld.Type() != reflect.TypeOf(time.Time{}) {
-			return fmt.Errorf("not a time.Time field")
-		}
 		if Debug {
 			fmt.Printf("\n=== TIME HANDLER DEBUG ===\n")
 			fmt.Printf("Field type: %v\n", fld.Type())
 			fmt.Printf("Value type: %T\n", valueI)
 			fmt.Printf("Value: %+v\n", valueI)
+		}
+		// Only handle time.Time fields
+		if fld.Type() != reflect.TypeOf(time.Time{}) {
+			return fmt.Errorf("not a time.Time field")
 		}
 
 		switch v := valueI.(type) {
@@ -74,20 +74,20 @@ func InitSetterStruct() {
 	// Register Struct handler
 	NewSetterCase(func(fld reflect.Value, value reflect.Value, valueI any) error {
 		if Debug {
-			fmt.Printf("------------------- STRUCT HANDLER\n")
-			fmt.Printf("------------------- Field type: %v\n", fld.Type())
-			fmt.Printf("------------------- Value type: %T\n", valueI)
-			fmt.Printf("------------------- Value: %+v\n", valueI)
+			fmt.Printf("\n=== STRUCT HANDLER DEBUG ===\n")
+			fmt.Printf("Field type: %v\n", fld.Type())
+			fmt.Printf("Value type: %T\n", valueI)
+			fmt.Printf("Value: %+v\n", valueI)
 		}
 
 		// Handle SQL null types first
 		if strings.HasPrefix(fld.Type().String(), "sql.Null") {
 			if Debug {
-				fmt.Printf("------------------- Found SQL type\n")
+				fmt.Printf("Found SQL type\n")
 			}
 			if err := handleSqlNull(fld, valueI); err != nil {
 				if Debug {
-					fmt.Printf("------------------- SQL handler returned error: %v\n", err)
+					fmt.Printf("SQL handler returned error: %v\n", err)
 				}
 				return err
 			}
@@ -97,12 +97,12 @@ func InitSetterStruct() {
 		// Handle direct struct assignment
 		if value.Type().Kind() == reflect.Struct {
 			if Debug {
-				fmt.Printf("------------------- Handling direct struct assignment\n")
+				fmt.Printf("Handling direct struct assignment\n")
 			}
 			// If types match exactly, do direct assignment
 			if value.Type() == fld.Type() {
 				if Debug {
-					fmt.Printf("------------------- Types match exactly, doing direct assignment\n")
+					fmt.Printf("Types match exactly, doing direct assignment\n")
 				}
 				fld.Set(value)
 				return nil
@@ -112,19 +112,19 @@ func InitSetterStruct() {
 		// Special handling for time.Time
 		if fld.Type() == reflect.TypeOf(time.Time{}) {
 			if Debug {
-				fmt.Printf("------------------- Handling time.Time field\n")
+				fmt.Printf("Handling time.Time field\n")
 			}
 			switch v := valueI.(type) {
 			case time.Time:
 				if Debug {
-					fmt.Printf("------------------- Setting time value: %v\n", v)
+					fmt.Printf("Setting time value: %v\n", v)
 				}
 				fld.Set(reflect.ValueOf(v))
 				return nil
 			case *time.Time:
 				if v != nil {
 					if Debug {
-						fmt.Printf("------------------- Setting pointer time value: %v\n", *v)
+						fmt.Printf("Setting pointer time value: %v\n", *v)
 					}
 					fld.Set(reflect.ValueOf((*v)))
 				}
@@ -132,7 +132,7 @@ func InitSetterStruct() {
 			case string:
 				if t, err := parseTimeString(v); err == nil {
 					if Debug {
-						fmt.Printf("------------------- Setting parsed time value: %v\n", t)
+						fmt.Printf("Setting parsed time value: %v\n", t)
 					}
 					fld.Set(reflect.ValueOf(t))
 					return nil
@@ -141,37 +141,37 @@ func InitSetterStruct() {
 				}
 			case int:
 				if Debug {
-					fmt.Printf("------------------- Setting int value as time: %d\n", v)
+					fmt.Printf("Setting int value as time: %d\n", v)
 				}
 				fld.Set(reflect.ValueOf(time.Unix(int64(v), 0)))
 				return nil
 			case int64:
 				if Debug {
-					fmt.Printf("------------------- Setting int64 value as time: %d\n", v)
+					fmt.Printf("Setting int64 value as time: %d\n", v)
 				}
 				fld.Set(reflect.ValueOf(time.Unix(v, 0)))
 				return nil
 			case int32:
 				if Debug {
-					fmt.Printf("------------------- Setting int32 value as time: %d\n", v)
+					fmt.Printf("Setting int32 value as time: %d\n", v)
 				}
 				fld.Set(reflect.ValueOf(time.Unix(int64(v), 0)))
 				return nil
 			case uint:
 				if Debug {
-					fmt.Printf("------------------- Setting uint value as time: %d\n", v)
+					fmt.Printf("Setting uint value as time: %d\n", v)
 				}
 				fld.Set(reflect.ValueOf(time.Unix(int64(v), 0)))
 				return nil
 			case uint64:
 				if Debug {
-					fmt.Printf("------------------- Setting uint64 value as time: %d\n", v)
+					fmt.Printf("Setting uint64 value as time: %d\n", v)
 				}
 				fld.Set(reflect.ValueOf(time.Unix(int64(v), 0)))
 				return nil
 			case uint32:
 				if Debug {
-					fmt.Printf("------------------- Setting uint32 value as time: %d\n", v)
+					fmt.Printf("Setting uint32 value as time: %d\n", v)
 				}
 				fld.Set(reflect.ValueOf(time.Unix(int64(v), 0)))
 				return nil
@@ -182,13 +182,13 @@ func InitSetterStruct() {
 		switch vTyped := valueI.(type) {
 		case map[string]any:
 			if Debug {
-				fmt.Printf("------------------- Handling map[string]any: %+v\n", vTyped)
+				fmt.Printf("Handling map[string]any: %+v\n", vTyped)
 			}
 			for key, val := range vTyped {
 				// Convert snake_case to TitleCase
 				fieldName := SnakeCaseToTitle(key)
 				if Debug {
-					fmt.Printf("------------------- Converting field name from %s to %s\n", key, fieldName)
+					fmt.Printf("Converting field name from %s to %s\n", key, fieldName)
 				}
 
 				field := fld.FieldByName(fieldName)
@@ -213,7 +213,7 @@ func InitSetterStruct() {
 
 		case []KV:
 			if Debug {
-				fmt.Printf("------------------- Handling []KV: %+v\n", vTyped)
+				fmt.Printf("Handling []KV: %+v\n", vTyped)
 			}
 			// Check if we're setting a slice field with an index
 			if fld.Kind() == reflect.Slice {
@@ -250,7 +250,7 @@ func InitSetterStruct() {
 				// Convert snake_case to TitleCase
 				fieldName := SnakeCaseToTitle(val.Key)
 				if Debug {
-					fmt.Printf("------------------- Converting field name from %s to %s\n", val.Key, fieldName)
+					fmt.Printf("Converting field name from %s to %s\n", val.Key, fieldName)
 				}
 
 				field := fld.FieldByName(fieldName)
@@ -275,19 +275,19 @@ func InitSetterStruct() {
 
 		case KV:
 			if Debug {
-				fmt.Printf("------------------- Handling KV: %+v\n", vTyped)
+				fmt.Printf("Handling KV: %+v\n", vTyped)
 			}
 			parts := strings.Split(vTyped.Key, ".")
 			if len(parts) > 1 {
 				if Debug {
-					fmt.Printf("------------------- Found nested key: %v\n", parts)
+					fmt.Printf("Found nested key: %v\n", parts)
 				}
 				// Try to parse the first part as an index if the field is a slice
 				if fld.Kind() == reflect.Slice {
 					index, err := strconv.Atoi(parts[0])
 					if err == nil {
 						if Debug {
-							fmt.Printf("------------------- Found slice index: %d\n", index)
+							fmt.Printf("Found slice index: %d\n", index)
 						}
 						// Ensure slice has enough capacity
 						if index >= fld.Len() {
@@ -333,7 +333,7 @@ func InitSetterStruct() {
 				// If it's a slice and we're not accessing by index, we need to create a new element
 				if nestedField.Kind() == reflect.Slice {
 					if Debug {
-						fmt.Printf("------------------- Found slice field: %v\n", nestedField.Type())
+						fmt.Printf("Found slice field: %v\n", nestedField.Type())
 					}
 					// Create a new element
 					elemType := nestedField.Type().Elem()
@@ -394,7 +394,7 @@ func InitSetterStruct() {
 			switch fld.Kind() {
 			case reflect.Map:
 				if Debug {
-					fmt.Printf("------------------- Handling map field\n")
+					fmt.Printf("Handling map field\n")
 				}
 				// For maps, use the key directly
 				if fld.IsNil() {
@@ -409,7 +409,7 @@ func InitSetterStruct() {
 				// Handle string value
 				if strValue, ok := vTyped.Value.(string); ok {
 					if Debug {
-						fmt.Printf("------------------- Handling string value: %s\n", strValue)
+						fmt.Printf("Handling string value: %s\n", strValue)
 					}
 					// Create key value based on map's key type
 					var keyValue reflect.Value
@@ -581,13 +581,13 @@ func InitSetterStruct() {
 
 			case reflect.Slice:
 				if Debug {
-					fmt.Printf("------------------- Handling slice field\n")
+					fmt.Printf("Handling slice field\n")
 				}
 				// For slices, try to parse the key as an index
 				index, err := strconv.Atoi(vTyped.Key)
 				if err == nil {
 					if Debug {
-						fmt.Printf("------------------- Found slice index: %d\n", index)
+						fmt.Printf("Found slice index: %d\n", index)
 					}
 					// Ensure slice has enough capacity
 					if index >= fld.Len() {
@@ -614,7 +614,7 @@ func InitSetterStruct() {
 				// If not an index, handle string values as comma-separated lists
 				if strValue, ok := vTyped.Value.(string); ok {
 					if Debug {
-						fmt.Printf("------------------- Handling comma-separated list: %s\n", strValue)
+						fmt.Printf("Handling comma-separated list: %s\n", strValue)
 					}
 					// Split the string value by commas
 					parts := strings.Split(strValue, ",")
@@ -641,7 +641,7 @@ func InitSetterStruct() {
 
 			case reflect.Struct:
 				if Debug {
-					fmt.Printf("------------------- Handling struct field\n")
+					fmt.Printf("Handling struct field\n")
 				}
 				// For structs, use FieldByName
 				field := fld.FieldByName(SnakeCaseToTitle(vTyped.Key))
@@ -658,7 +658,7 @@ func InitSetterStruct() {
 		// Try to convert the value to a struct
 		if reflect.TypeOf(valueI) != nil {
 			if Debug {
-				fmt.Printf("------------------- Converting value to struct\n")
+				fmt.Printf("Converting value to struct\n")
 			}
 			value := reflect.ValueOf(valueI)
 
@@ -674,7 +674,7 @@ func InitSetterStruct() {
 			// If types match exactly, do direct assignment
 			if value.Type() == fld.Type() {
 				if Debug {
-					fmt.Printf("------------------- Types match exactly, doing direct assignment\n")
+					fmt.Printf("Types match exactly, doing direct assignment\n")
 				}
 				fld.Set(value)
 				return nil
@@ -697,15 +697,16 @@ func handleSqlNull(fld reflect.Value, valueI any) error {
 	// Handle SQL null types first
 	if strings.HasPrefix(fld.Type().String(), "sql.Null") {
 		if Debug {
-			fmt.Printf("------------------- SQL type: %s\n", fld.Type().String())
-			fmt.Printf("------------------- Value type: %T\n", valueI)
-			fmt.Printf("------------------- Value: %+v\n", valueI)
+			fmt.Printf("\n=== STRUCT:handleSqlNull HANDLER DEBUG ===\n")
+			fmt.Printf("SQL type: %s\n", fld.Type().String())
+			fmt.Printf("Value type: %T\n", valueI)
+			fmt.Printf("Value: %+v\n", valueI)
 		}
 
 		// If it's a KV type, use its Value field
 		if kv, ok := valueI.(KV); ok {
 			if Debug {
-				fmt.Printf("------------------- Found KV type, Value: %+v\n", kv.Value)
+				fmt.Printf("Found KV type, Value: %+v\n", kv.Value)
 			}
 			valueI = kv.Value
 		}
@@ -713,11 +714,11 @@ func handleSqlNull(fld reflect.Value, valueI any) error {
 		switch fld.Type().String() {
 		case "sql.NullString":
 			if Debug {
-				fmt.Printf("------------------- Handling NullString\n")
+				fmt.Printf("Handling NullString\n")
 			}
 			if str, ok := valueI.(string); ok {
 				if Debug {
-					fmt.Printf("------------------- Setting string value: %s\n", str)
+					fmt.Printf("Setting string value: %s\n", str)
 				}
 				fld.Set(reflect.ValueOf(sql.NullString{String: str, Valid: true}))
 				return nil
@@ -727,31 +728,31 @@ func handleSqlNull(fld reflect.Value, valueI any) error {
 			}
 		case "sql.NullInt64":
 			if Debug {
-				fmt.Printf("------------------- Handling NullInt64\n")
+				fmt.Printf("Handling NullInt64\n")
 			}
 			switch v := valueI.(type) {
 			case int64:
 				if Debug {
-					fmt.Printf("------------------- Setting int64 value: %d\n", v)
+					fmt.Printf("Setting int64 value: %d\n", v)
 				}
 				fld.Set(reflect.ValueOf(sql.NullInt64{Int64: v, Valid: true}))
 				return nil
 			case int:
 				if Debug {
-					fmt.Printf("------------------- Setting int value: %d\n", v)
+					fmt.Printf("Setting int value: %d\n", v)
 				}
 				fld.Set(reflect.ValueOf(sql.NullInt64{Int64: int64(v), Valid: true}))
 				return nil
 			case float64:
 				if Debug {
-					fmt.Printf("------------------- Setting float64 value as int64: %f\n", v)
+					fmt.Printf("Setting float64 value as int64: %f\n", v)
 				}
 				fld.Set(reflect.ValueOf(sql.NullInt64{Int64: int64(v), Valid: true}))
 				return nil
 			case string:
 				if i, err := strconv.ParseInt(v, 10, 64); err == nil {
 					if Debug {
-						fmt.Printf("------------------- Setting parsed int64 value: %d\n", i)
+						fmt.Printf("Setting parsed int64 value: %d\n", i)
 					}
 					fld.Set(reflect.ValueOf(sql.NullInt64{Int64: i, Valid: true}))
 					return nil
@@ -762,37 +763,37 @@ func handleSqlNull(fld reflect.Value, valueI any) error {
 			}
 		case "sql.NullFloat64":
 			if Debug {
-				fmt.Printf("------------------- Handling NullFloat64\n")
+				fmt.Printf("Handling NullFloat64\n")
 			}
 			switch v := valueI.(type) {
 			case float64:
 				if Debug {
-					fmt.Printf("------------------- Setting float64 value: %f\n", v)
+					fmt.Printf("Setting float64 value: %f\n", v)
 				}
 				fld.Set(reflect.ValueOf(sql.NullFloat64{Float64: v, Valid: true}))
 				return nil
 			case float32:
 				if Debug {
-					fmt.Printf("------------------- Setting float32 value: %f\n", v)
+					fmt.Printf("Setting float32 value: %f\n", v)
 				}
 				fld.Set(reflect.ValueOf(sql.NullFloat64{Float64: float64(v), Valid: true}))
 				return nil
 			case int:
 				if Debug {
-					fmt.Printf("------------------- Setting int value as float64: %d\n", v)
+					fmt.Printf("Setting int value as float64: %d\n", v)
 				}
 				fld.Set(reflect.ValueOf(sql.NullFloat64{Float64: float64(v), Valid: true}))
 				return nil
 			case int64:
 				if Debug {
-					fmt.Printf("------------------- Setting int64 value as float64: %d\n", v)
+					fmt.Printf("Setting int64 value as float64: %d\n", v)
 				}
 				fld.Set(reflect.ValueOf(sql.NullFloat64{Float64: float64(v), Valid: true}))
 				return nil
 			case string:
 				if f, err := strconv.ParseFloat(v, 64); err == nil {
 					if Debug {
-						fmt.Printf("------------------- Setting parsed float64 value: %f\n", f)
+						fmt.Printf("Setting parsed float64 value: %f\n", f)
 					}
 					fld.Set(reflect.ValueOf(sql.NullFloat64{Float64: f, Valid: true}))
 					return nil
@@ -803,26 +804,26 @@ func handleSqlNull(fld reflect.Value, valueI any) error {
 			}
 		case "sql.NullBool":
 			if Debug {
-				fmt.Printf("------------------- Handling NullBool\n")
+				fmt.Printf("Handling NullBool\n")
 			}
 			switch v := valueI.(type) {
 			case bool:
 				if Debug {
-					fmt.Printf("------------------- Setting bool value: %v\n", v)
+					fmt.Printf("Setting bool value: %v\n", v)
 				}
 				fld.Set(reflect.ValueOf(sql.NullBool{Bool: v, Valid: true}))
 				return nil
 			case string:
 				if b, err := strconv.ParseBool(v); err == nil {
 					if Debug {
-						fmt.Printf("------------------- Setting parsed bool value: %v\n", b)
+						fmt.Printf("Setting parsed bool value: %v\n", b)
 					}
 					fld.Set(reflect.ValueOf(sql.NullBool{Bool: b, Valid: true}))
 					return nil
 				}
 			case int:
 				if Debug {
-					fmt.Printf("------------------- Setting int value as bool: %d\n", v)
+					fmt.Printf("Setting int value as bool: %d\n", v)
 				}
 				fld.Set(reflect.ValueOf(sql.NullBool{Bool: v != 0, Valid: true}))
 				return nil
@@ -832,26 +833,26 @@ func handleSqlNull(fld reflect.Value, valueI any) error {
 			}
 		case "sql.NullTime":
 			if Debug {
-				fmt.Printf("------------------- Handling NullTime\n")
+				fmt.Printf("Handling NullTime\n")
 			}
 			switch v := valueI.(type) {
 			case time.Time:
 				if Debug {
-					fmt.Printf("------------------- Setting time value: %v\n", v)
+					fmt.Printf("Setting time value: %v\n", v)
 				}
 				fld.Set(reflect.ValueOf(sql.NullTime{Time: v, Valid: true}))
 				return nil
 			case string:
 				if t, err := parseTimeString(v); err == nil {
 					if Debug {
-						fmt.Printf("------------------- Setting parsed time value: %v\n", t)
+						fmt.Printf("Setting parsed time value: %v\n", t)
 					}
 					fld.Set(reflect.ValueOf(sql.NullTime{Time: t, Valid: true}))
 					return nil
 				}
 			case int64:
 				if Debug {
-					fmt.Printf("------------------- Setting int64 value as time: %d\n", v)
+					fmt.Printf("Setting int64 value as time: %d\n", v)
 				}
 				fld.Set(reflect.ValueOf(sql.NullTime{Time: time.Unix(v, 0), Valid: true}))
 				return nil
@@ -861,7 +862,7 @@ func handleSqlNull(fld reflect.Value, valueI any) error {
 			}
 		}
 		if Debug {
-			fmt.Printf("------------------- Failed to handle SQL type\n")
+			fmt.Printf("Failed to handle SQL type\n")
 		}
 	}
 	return nil
