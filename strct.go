@@ -7,13 +7,13 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/kamalshkeir/kmap"
+	"github.com/kamalshkeir/kstrct/safemap"
 )
 
 var (
 	ErrorExpectedPtr = errors.New("expected value to Fill to be a pointer")
 	ErrorDoublePtr   = errors.New("got double pointer")
-	cacheFieldsIndex = kmap.New[string, *fieldCache]()
+	cacheFieldsIndex = safemap.New[string, *fieldCache]()
 	kvPool           = sync.Pool{
 		New: func() any {
 			s := make([]KV, 0, 50)

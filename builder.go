@@ -705,18 +705,18 @@ func (b *StructBuilder) Filter(predicate func(name string, value any) bool) map[
 	return result
 }
 
-func (b *StructBuilder) init(t reflect.Type) {
-	fields := newFieldInfoMap(t.NumField())
-	for i := 0; i < t.NumField(); i++ {
-		field := t.Field(i)
-		name := ToSnakeCase(field.Name)
-		fields.set(name, fieldInfo{
-			offset: field.Offset,
-			typ:    field.Type,
-		})
-	}
-	b.fields = fields
-}
+// func (b *StructBuilder) init(t reflect.Type) {
+// 	fields := newFieldInfoMap(t.NumField())
+// 	for i := 0; i < t.NumField(); i++ {
+// 		field := t.Field(i)
+// 		name := ToSnakeCase(field.Name)
+// 		fields.set(name, fieldInfo{
+// 			offset: field.Offset,
+// 			typ:    field.Type,
+// 		})
+// 	}
+// 	b.fields = fields
+// }
 
 // GetString gets a string field value by name with zero allocations
 func (b *StructBuilder) GetString(fieldPath string) string {

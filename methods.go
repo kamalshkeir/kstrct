@@ -4,14 +4,14 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/kamalshkeir/kmap"
+	"github.com/kamalshkeir/kstrct/safemap"
 )
 
 // MethodFunc represents a method function that can be added to a struct
 type MethodFunc any
 
 // methodCache stores methods for each type
-var methodCache = kmap.New[string, *kmap.SafeMap[string, MethodFunc]]()
+var methodCache = safemap.New[string, *safemap.SafeMap[string, MethodFunc]]()
 
 // AddMethod adds a method to a struct type. The method must be of the form:
 // func(receiver T) methodName([args ...]) [results...]
@@ -39,11 +39,11 @@ func AddMethod(structPtr any, methodName string, methodFunc MethodFunc) error {
 
 	// Get or create method map for this type
 	typeKey := structType.String()
-	var methodMap *kmap.SafeMap[string, MethodFunc]
+	var methodMap *safemap.SafeMap[string, MethodFunc]
 	if v, ok := methodCache.Get(typeKey); ok {
 		methodMap = v
 	} else {
-		methodMap = kmap.New[string, MethodFunc]()
+		methodMap = safemap.New[string, MethodFunc]()
 		methodCache.Set(typeKey, methodMap)
 	}
 
