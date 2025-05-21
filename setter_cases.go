@@ -289,7 +289,52 @@ func init() {
 			if b, err := strconv.ParseBool(v); err == nil {
 				boolVal = b
 			} else {
-				return fmt.Errorf("cannot convert string %q to bool: %v", v, err)
+				if v == "1" {
+					boolVal = true
+				} else if v == "0" {
+					boolVal = false
+				} else {
+					return fmt.Errorf("cannot convert string %q to bool: %v", v, err)
+				}
+			}
+		case int, int64, uint, uint64, uint32, uint16, uint8, int32, int16, int8:
+			if v == 1 {
+				boolVal = true
+			} else if v == 0 {
+				boolVal = false
+			} else {
+				return fmt.Errorf("cannot convert number %d to bool", v)
+			}
+		case *int, *int64, *uint, *uint64, *uint32, *uint16, *uint8, *int32, *int16, *int8:
+			if v == 1 {
+				boolVal = true
+			} else if v == 0 {
+				boolVal = false
+			} else {
+				return fmt.Errorf("cannot convert *number %v to bool", v)
+			}
+		case Iint:
+			if v.Int() == 1 {
+				boolVal = true
+			} else if v.Int() == 0 {
+				boolVal = false
+			} else {
+				return fmt.Errorf("cannot convert Iint %d to bool", v.Int())
+			}
+
+		case Ibool:
+			boolVal = v.Bool()
+		case Istring:
+			if b, err := strconv.ParseBool(v.String()); err == nil {
+				boolVal = b
+			} else {
+				if v.String() == "1" {
+					boolVal = true
+				} else if v.String() == "0" {
+					boolVal = false
+				} else {
+					return fmt.Errorf("cannot convert Istring %q to bool: %v", v.String(), err)
+				}
 			}
 		default:
 			if value.Type().ConvertibleTo(fld.Type()) {
