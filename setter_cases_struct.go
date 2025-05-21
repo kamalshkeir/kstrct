@@ -193,7 +193,7 @@ func InitSetterStruct() {
 
 				field := fld.FieldByName(fieldName)
 				if !field.IsValid() {
-					return fmt.Errorf("field %s not found", key)
+					return fmt.Errorf("field %s not found (fname: %s) ,  (vTyped: %v) (field: %#v)", key, fieldName, vTyped, fld.Interface())
 				}
 
 				// If the value is a map and the field is a struct, handle it recursively

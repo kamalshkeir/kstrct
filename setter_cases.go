@@ -298,20 +298,170 @@ func init() {
 				}
 			}
 		case int, int64, uint, uint64, uint32, uint16, uint8, int32, int16, int8:
-			if v == 1 {
-				boolVal = true
-			} else if v == 0 {
-				boolVal = false
-			} else {
-				return fmt.Errorf("cannot convert number %d to bool", v)
+			switch v.(type) {
+			case int:
+				if v == 1 {
+					boolVal = true
+				} else if v == 0 {
+					boolVal = false
+				} else {
+					return fmt.Errorf("cannot convert number int %d to bool", v)
+				}
+			case int64:
+				if v == int64(1) {
+					boolVal = true
+				} else if v == int64(0) {
+					boolVal = false
+				} else {
+					return fmt.Errorf("cannot convert number int64 %d to bool", v)
+				}
+			case uint:
+				if v == uint(1) {
+					boolVal = true
+				} else if v == uint(0) {
+					boolVal = false
+				} else {
+					return fmt.Errorf("cannot convert number uint %d to bool", v)
+				}
+			case uint8:
+				if v == uint8(1) {
+					boolVal = true
+				} else if v == uint8(0) {
+					boolVal = false
+				} else {
+					return fmt.Errorf("cannot convert number uint8 %d to bool", v)
+				}
+			case uint16:
+				if v == uint16(1) {
+					boolVal = true
+				} else if v == uint16(0) {
+					boolVal = false
+				} else {
+					return fmt.Errorf("cannot convert number uint64 %d to bool", v)
+				}
+			case uint32:
+				if v == uint32(1) {
+					boolVal = true
+				} else if v == uint32(0) {
+					boolVal = false
+				} else {
+					return fmt.Errorf("cannot convert number uint32 %d to bool", v)
+				}
+			case uint64:
+				if v == uint64(1) {
+					boolVal = true
+				} else if v == uint64(0) {
+					boolVal = false
+				} else {
+					return fmt.Errorf("cannot convert number uint64 %d to bool", v)
+				}
+			case int32:
+				if v == int32(1) {
+					boolVal = true
+				} else if v == int32(0) {
+					boolVal = false
+				} else {
+					return fmt.Errorf("cannot convert number int32 %d to bool", v)
+				}
+			case int16:
+				if v == int16(1) {
+					boolVal = true
+				} else if v == int16(0) {
+					boolVal = false
+				} else {
+					return fmt.Errorf("cannot convert number int16 %d to bool", v)
+				}
+			case int8:
+				if v == int8(1) {
+					boolVal = true
+				} else if v == int8(0) {
+					boolVal = false
+				} else {
+					return fmt.Errorf("cannot convert number int8 %d to bool", v)
+				}
 			}
 		case *int, *int64, *uint, *uint64, *uint32, *uint16, *uint8, *int32, *int16, *int8:
-			if v == 1 {
-				boolVal = true
-			} else if v == 0 {
-				boolVal = false
-			} else {
-				return fmt.Errorf("cannot convert *number %v to bool", v)
+			switch v.(type) {
+			case int:
+				if v == 1 {
+					boolVal = true
+				} else if v == 0 {
+					boolVal = false
+				} else {
+					return fmt.Errorf("cannot convert number *int %d to bool", v)
+				}
+			case int64:
+				if v == int64(1) {
+					boolVal = true
+				} else if v == int64(0) {
+					boolVal = false
+				} else {
+					return fmt.Errorf("cannot convert number *int64 %d to bool", v)
+				}
+			case uint:
+				if v == uint(1) {
+					boolVal = true
+				} else if v == uint(0) {
+					boolVal = false
+				} else {
+					return fmt.Errorf("cannot convert number *uint %d to bool", v)
+				}
+			case uint8:
+				if v == uint8(1) {
+					boolVal = true
+				} else if v == uint8(0) {
+					boolVal = false
+				} else {
+					return fmt.Errorf("cannot convert number *uint8 %d to bool", v)
+				}
+			case uint16:
+				if v == uint16(1) {
+					boolVal = true
+				} else if v == uint16(0) {
+					boolVal = false
+				} else {
+					return fmt.Errorf("cannot convert number *uint64 %d to bool", v)
+				}
+			case uint32:
+				if v == uint32(1) {
+					boolVal = true
+				} else if v == uint32(0) {
+					boolVal = false
+				} else {
+					return fmt.Errorf("cannot convert number *uint32 %d to bool", v)
+				}
+			case uint64:
+				if v == uint64(1) {
+					boolVal = true
+				} else if v == uint64(0) {
+					boolVal = false
+				} else {
+					return fmt.Errorf("cannot convert number *uint64 %d to bool", v)
+				}
+			case int32:
+				if v == int32(1) {
+					boolVal = true
+				} else if v == int32(0) {
+					boolVal = false
+				} else {
+					return fmt.Errorf("cannot convert number *int32 %d to bool", v)
+				}
+			case int16:
+				if v == int16(1) {
+					boolVal = true
+				} else if v == int16(0) {
+					boolVal = false
+				} else {
+					return fmt.Errorf("cannot convert number *int16 %d to bool", v)
+				}
+			case int8:
+				if v == int8(1) {
+					boolVal = true
+				} else if v == int8(0) {
+					boolVal = false
+				} else {
+					return fmt.Errorf("cannot convert number *int8 %d to bool", v)
+				}
 			}
 		case Iint:
 			if v.Int() == 1 {
